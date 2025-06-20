@@ -46,6 +46,11 @@
                         <h2 class="text-xl font-bold mb-4">API & 應用程式設定</h2>
                         <div class="space-y-4">
                             <div>
+                                <label for="drive-folder-name" class="block text-sm font-medium text-gray-700">Google Drive 資料夾名稱</label>
+                                <input type="text" id="drive-folder-name" class="mt-1 w-full p-2 border rounded-md" placeholder="例如：Project_SaaS_Analysis">
+                            </div>
+                            <hr/>
+                            <div>
                                 <label for="google-api-key" class="block text-sm font-medium text-gray-700">Google API 金鑰</label>
                                 <input type="password" id="google-api-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 Google API 金鑰">
                             </div>
@@ -107,15 +112,18 @@
                         <div id="results-panel" class="panel active p-6">
                            <div id="results-content" class="min-h-[400px]">
                                 <div id="loading-indicator" class="flex flex-col items-center justify-center h-full">
+                                    <div class="spinner hidden"></div>
                                     <p id="loading-status" class="mt-4 text-gray-600 font-medium">請先完成左側設定並點擊開始分析</p>
                                 </div>
                                <div id="results-tabs-container" class="hidden">
                                     <div class="flex border-b">
                                         <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">A. 關鍵字分析</button>
-                                        <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">B & C. 競品分析</button>
+                                        <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">B. 競爭對手網站</button>
+                                        <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="linkedin">C. LinkedIn 分析</button>
                                     </div>
                                     <div id="keywords-result-panel" class="result-panel active p-4"></div>
                                     <div id="competitors-result-panel" class="result-panel p-4"></div>
+                                    <div id="linkedin-result-panel" class="result-panel p-4"></div>
                                </div>
                            </div>
                            <div id="results-actions" class="hidden mt-4 flex gap-4">
@@ -135,33 +143,17 @@
         </div>
     </main>
 <script>
-// --- Client-Side Application Logic ---
-
-// --- 1. State and Configuration ---
 const state = {
-    gapiReady: false,
-    gisReady: false,
-    tokenClient: null,
-    accessToken: null,
-    userProfile: null,
-    driveFolderId: null,
-    apiKeys: {
-        google: null,
-        searchEngineId: null,
-        aiProvider: 'gemini',
-        ai: null
-    },
-    isApiReady: false,
-    currentResults: null
+    gapiReady: false, gisReady: false, tokenClient: null, accessToken: null, userProfile: null, driveFolderId: null,
+    apiKeys: { google: null, searchEngineId: null, aiProvider: 'gemini', ai: null, driveFolderName: 'MarketingAnalysisTool_Data' },
+    isApiReady: false, currentResults: null
 };
 
 const CONFIG = {
     CLIENT_ID: "733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com",
-    SCOPES: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
-    DRIVE_FOLDER_NAME: "MarketingAnalysisTool_Data"
+    SCOPES: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"
 };
 
-// --- 2. Element References ---
 const ui = {
     authorizeButton: document.getElementById('authorize_button'),
     signOutButton: document.getElementById('signout_button'),
@@ -171,20 +163,28 @@ const ui = {
     saveSettingsBtn: document.getElementById('save-settings-btn'),
     startAnalysisBtn: document.getElementById('start-analysis-btn'),
     loadingIndicator: document.getElementById('loading-indicator'),
+    spinner: document.querySelector('.spinner'),
     loadingStatus: document.getElementById('loading-status'),
     resultsContainer: document.getElementById('results-tabs-container'),
     resultsActions: document.getElementById('results-actions'),
     historyList: document.getElementById('history-list'),
 };
 
-// --- 3. Initialization ---
 window.onload = () => {
-    gapi.load('client', gapiLoaded);
+    gapi.load('client', () => { state.gapiReady = true; checkAuthReady(); });
     const gisScript = document.createElement('script');
     gisScript.src = 'https://accounts.google.com/gsi/client';
     gisScript.async = true;
     gisScript.defer = true;
-    gisScript.onload = gisLoaded;
+    gisScript.onload = () => {
+        state.tokenClient = google.accounts.oauth2.initTokenClient({
+            client_id: CONFIG.CLIENT_ID,
+            scope: CONFIG.SCOPES,
+            callback: gisInCallback,
+        });
+        state.gisReady = true;
+        checkAuthReady();
+    };
     document.body.appendChild(gisScript);
     setupEventListeners();
 };
@@ -197,20 +197,14 @@ function setupEventListeners() {
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', handleTabSwitch));
     document.getElementById('history-list').addEventListener('click', handleHistoryAction);
     document.getElementById('results-actions').addEventListener('click', handleResultAction);
+    document.getElementById('results-tabs-container').addEventListener('click', handleTabSwitch);
 }
 
-// --- 4. Authentication & Authorization ---
-function gapiLoaded() { gapi.client.init({}).then(() => { state.gapiReady = true; checkAuthReady(); }); }
-function gisLoaded() {
-    state.tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CONFIG.CLIENT_ID,
-        scope: CONFIG.SCOPES,
-        callback: gisInCallback,
-    });
-    state.gisReady = true;
-    checkAuthReady();
+function checkAuthReady() {
+    if (state.gapiReady && state.gisReady) {
+        gapi.client.init({}).then(() => ui.authorizeButton.classList.remove('hidden'));
+    }
 }
-function checkAuthReady() { if (state.gapiReady && state.gisReady) ui.authorizeButton.classList.remove('hidden'); }
 
 function gisInCallback(resp) {
     if (resp.error) { showAlert('認證錯誤', resp.error, 'error'); return; }
@@ -220,11 +214,8 @@ function gisInCallback(resp) {
 }
 
 function handleAuthClick() {
-    if (gapi.client.getToken() === null) {
-        state.tokenClient.requestAccessToken({ prompt: 'consent' });
-    } else {
-        state.tokenClient.requestAccessToken({ prompt: '' });
-    }
+    if (gapi.client.getToken() === null) { state.tokenClient.requestAccessToken({ prompt: 'consent' }); } 
+    else { state.tokenClient.requestAccessToken({ prompt: '' }); }
 }
 
 async function handleSuccessfulLogin() {
@@ -232,15 +223,15 @@ async function handleSuccessfulLogin() {
     ui.userProfile.classList.remove('hidden');
     ui.userProfile.classList.add('flex');
     ui.appContainer.classList.remove('locked');
-
     const profile = await gapi.client.oauth2.userinfo.get();
     state.userProfile = profile.result;
     document.getElementById('user-avatar').src = state.userProfile.picture;
     document.getElementById('user-name').textContent = state.userProfile.given_name || state.userProfile.name;
-
     loadSettingsFromLocalStorage();
-    await setupGoogleDrive();
-    loadAnalysisHistory();
+    if(state.isApiReady) {
+        await setupGoogleDrive();
+        loadAnalysisHistory();
+    }
 }
 
 function handleSignOutClick() {
@@ -258,22 +249,26 @@ function handleSignOutClick() {
     }
 }
 
-// --- 5. API Settings ---
-function handleSaveSettings() {
+async function handleSaveSettings() {
+    const driveFolderName = document.getElementById('drive-folder-name').value.trim();
     const googleApiKey = document.getElementById('google-api-key').value.trim();
     const searchEngineId = document.getElementById('search-engine-id').value.trim();
     const aiProvider = document.getElementById('ai-provider').value;
     const aiApiKey = document.getElementById('ai-api-key').value.trim();
     
-    if (!googleApiKey || !searchEngineId || !aiApiKey) {
-        showAlert('資訊不完整', '請填寫所有 API 金鑰與 ID 欄位。', 'warning');
+    if (!driveFolderName || !googleApiKey || !searchEngineId || !aiApiKey) {
+        showAlert('資訊不完整', '請填寫所有 API 金鑰與資料夾名稱欄位。', 'warning');
         return;
     }
-    state.apiKeys = { google: googleApiKey, searchEngineId: searchEngineId, aiProvider: aiProvider, ai: aiApiKey };
+    state.apiKeys = { driveFolderName, google: googleApiKey, searchEngineId, aiProvider, ai: aiApiKey };
     localStorage.setItem('marketingToolApiKeys', btoa(JSON.stringify(state.apiKeys)));
     state.isApiReady = true;
     ui.analysisSection.classList.remove('locked');
-    showAlert('設定已儲存', 'API 已設定完成並啟用。', 'success');
+    showAlert('設定已儲存', 'API 已設定完成並啟用，正在設定 Google Drive 資料夾...', 'success');
+    
+    // Setup Drive folder immediately after saving settings
+    await setupGoogleDrive();
+    loadAnalysisHistory();
 }
 
 function loadSettingsFromLocalStorage() {
@@ -283,40 +278,46 @@ function loadSettingsFromLocalStorage() {
             const decodedKeys = JSON.parse(atob(savedKeys));
             state.apiKeys = decodedKeys;
             state.isApiReady = true;
+            document.getElementById('drive-folder-name').value = state.apiKeys.driveFolderName || 'MarketingAnalysisTool_Data';
             document.getElementById('google-api-key').value = state.apiKeys.google || '';
             document.getElementById('search-engine-id').value = state.apiKeys.searchEngineId || '';
             document.getElementById('ai-provider').value = state.apiKeys.aiProvider || 'gemini';
             document.getElementById('ai-api-key').value = state.apiKeys.ai || '';
             ui.analysisSection.classList.remove('locked');
-        } catch (e) {
-            console.error("無法解析已儲存的 API 金鑰:", e);
-        }
+        } catch (e) { console.error("無法解析已儲存的 API 金鑰:", e); }
     }
 }
 
-// --- 6. Google Drive Integration ---
 async function setupGoogleDrive() {
-    await gapi.client.load('drive', 'v3');
-    const response = await gapi.client.drive.files.list({
-        q: `name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: 'files(id)'
-    });
-    if (response.result.files && response.result.files.length > 0) {
-        state.driveFolderId = response.result.files[0].id;
-    } else {
-        const fileMetadata = { 'name': CONFIG.DRIVE_FOLDER_NAME, 'mimeType': 'application/vnd.google-apps.folder' };
-        const createResponse = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
-        state.driveFolderId = createResponse.result.id;
+    if (!state.isApiReady) return;
+    try {
+        await gapi.client.load('drive', 'v3');
+        const folderName = state.apiKeys.driveFolderName;
+        const response = await gapi.client.drive.files.list({
+            q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            fields: 'files(id)'
+        });
+        if (response.result.files && response.result.files.length > 0) {
+            state.driveFolderId = response.result.files[0].id;
+        } else {
+            const fileMetadata = { 'name': folderName, 'mimeType': 'application/vnd.google-apps.folder' };
+            const createResponse = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
+            state.driveFolderId = createResponse.result.id;
+        }
+        showAlert('Google Drive 已就緒', `將使用資料夾 "${folderName}" 存取紀錄。`, 'info');
+    } catch(error) {
+        console.error("Google Drive 設定失敗:", error);
+        showAlert('Drive 設定失敗', `無法存取或建立資料夾: ${error.message}`, 'error');
     }
 }
 
-// --- 7. Main Analysis Workflow ---
 async function startAnalysisWorkflow() {
     if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); return; }
     const coreKeyword = document.getElementById('core-keyword').value.trim();
     if (!coreKeyword) { showAlert('需要輸入', '請輸入行業、品牌或產品關鍵字。', 'warning'); return; }
 
-    ui.loadingIndicator.style.display = 'flex';
+    ui.loadingIndicator.classList.remove('hidden');
+    ui.spinner.classList.remove('hidden');
     ui.loadingStatus.textContent = '準備中...';
     ui.resultsContainer.classList.add('hidden');
     
@@ -338,13 +339,13 @@ async function startAnalysisWorkflow() {
 
     } catch (error) {
         console.error("分析失敗:", error);
-        showAlert('分析失敗', `發生錯誤: ${error.message}`, 'error');
+        showAlert('分析失敗', `發生錯誤: ${error?.message || '未知錯誤'}`, 'error');
     } finally {
-        ui.loadingIndicator.style.display = 'none';
+        ui.spinner.classList.add('hidden');
+        ui.loadingStatus.textContent = '分析結束。您可以開始下一次分析。';
     }
 }
 
-// --- 8. API Call Functions ---
 async function getAiKeywordAnalysis() {
     const marketInfo = document.getElementById('target-market').value.split('|');
     const prompt = `你是一位專精於 ${marketInfo[2]} 市場的資深SEO與市場分析專家。請針對以下條件，生成一份詳細的關鍵字分析報告：- 核心主題: "${document.getElementById('core-keyword').value}" - 商業模式: "${document.querySelector('input[name="business-model"]:checked').value}" - 目標語言: "${marketInfo[1]}" 請提供 50 個最相關的關鍵字，盡可能涵蓋短尾、中尾和長尾關鍵字。對於每個關鍵字，請評估其「搜尋量級」（高、中、低）和「關鍵字類型」（例如：品牌字、產品字、比較字、問題字、資訊字）。請嚴格以 JSON 格式返回，不要包含任何 json 標籤或註解，格式如下：{ "keywords": [{ "keyword": "...", "volume": "高", "type": "產品字" }, ...] }`;
@@ -354,7 +355,10 @@ async function getAiKeywordAnalysis() {
 async function performGoogleSearch(keywords) {
     if (!keywords || keywords.length === 0) return [];
     const query = keywords.filter(k => k.volume === '高').slice(0, 3).map(k => `"${k.keyword}"`).join(' OR ');
-    if (!query) return [];
+    if (!query) {
+        showAlert('搜尋提示', '未找到高流量關鍵字，將使用核心關鍵字進行搜尋。', 'info');
+        return performGoogleSearch([{ keyword: document.getElementById('core-keyword').value.trim(), volume: '高' }]);
+    };
     const marketInfo = document.getElementById('target-market').value.split('|');
     const response = await gapi.client.request({
         'path': `https://customsearch.googleapis.com/customsearch/v1`,
@@ -379,7 +383,7 @@ async function callGeminiAPI(prompt) {
     });
     if (!response.ok) {
         const errorBody = await response.json();
-        throw new Error(`Gemini API Error: ${errorBody.error.message}`);
+        throw new Error(`Gemini API Error: ${errorBody?.error?.message || '未知錯誤'}`);
     }
     const data = await response.json();
     if (!data.candidates || !data.candidates[0].content.parts[0].text) {
@@ -388,56 +392,30 @@ async function callGeminiAPI(prompt) {
     return data.candidates[0].content.parts[0].text;
 }
 
-// --- 9. Rendering, History & Export ---
 function renderPartialResults(type) {
     ui.resultsContainer.classList.remove('hidden');
+    ui.loadingIndicator.classList.add('hidden');
     if (type === 'keywords') {
         const panel = document.getElementById('keywords-result-panel');
-        const groupedKeywords = (state.currentResults.keywords || []).reduce((acc, kw) => {
-            if (!acc[kw.type]) acc[kw.type] = [];
-            acc[kw.type].push(kw);
-            return acc;
-        }, {});
-        
-        const volumeColorMap = { '高': 'bg-red-200 text-red-800', '中': 'bg-yellow-200 text-yellow-800', '低': 'bg-green-200 text-green-800' };
-
-        panel.innerHTML = Object.entries(groupedKeywords).map(([type, kws]) => `
-            <div class="mb-6">
-                <h4 class="font-bold text-lg mb-3 text-gray-700">${type}</h4>
-                <div class="flex flex-wrap gap-2">
-                    ${kws.map(kw => `<span class="px-3 py-1 rounded-full text-sm font-medium ${volumeColorMap[kw.volume] || 'bg-gray-200'}">${kw.keyword}</span>`).join('')}
-                </div>
-            </div>
-        `).join('') || '<p>無關鍵字資料</p>';
+        panel.innerHTML = `<table class="w-full text-left text-sm">
+            <thead class="bg-gray-50"><tr class="border-b"><th class="py-2 px-2">關鍵字</th><th>搜尋量級</th><th>類型</th></tr></thead>
+            <tbody>${state.currentResults.keywords.map(k => `<tr class="border-b"><td class="py-2 px-2">${k.keyword}</td><td>${k.volume}</td><td>${k.type}</td></tr>`).join('')}</tbody>
+        </table>`;
     }
-    
     if (type === 'competitors') {
-        const panel = document.getElementById('competitors-result-panel');
-        panel.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            ${(state.currentResults.competitors || []).map(c => `
-                <div class="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
-                    <h4 class="font-bold text-xl text-indigo-700">${c.brandName}</h4>
-                    <p class="text-sm text-gray-500 mt-1 mb-3">${c.companyType}</p>
-                    <p class="text-gray-700 mb-4">${c.summary}</p>
-                    <div class="mt-auto flex gap-4 border-t pt-3">
-                        <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">官方網站</a>
-                        ${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">LinkedIn</a>` : '<span class="text-gray-400">無 LinkedIn</span>'}
-                    </div>
-                </div>
-            `).join('')}
-        </div>` || '<p>無競爭對手資料</p>';
-        
-        // Hide individual B and C tabs, as they are now combined.
-        document.querySelector('.result-tab-btn[data-result-tab="competitors"]').textContent = 'B & C. 競品分析';
-        document.querySelector('.result-tab-btn[data-result-tab="linkedin"]')?.remove();
-        
+        const competitorsPanel = document.getElementById('competitors-result-panel');
+        competitorsPanel.innerHTML = state.currentResults.competitors.map(c => `<div class="p-3 border rounded-lg mb-3"><p class="font-bold text-lg text-indigo-700">${c.brandName}</p><p class="text-sm text-gray-600 mt-1">${c.summary}</p><div class="mt-2 text-sm"><a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline">官方網站</a></div></div>`).join('') || '<p>無競爭對手資料</p>';
+        const linkedinPanel = document.getElementById('linkedin-result-panel');
+        linkedinPanel.innerHTML = state.currentResults.competitors.map(c => `<div class="p-3 border rounded-lg mb-3"><p class="font-bold text-lg text-indigo-700">${c.brandName}</p><p class="mt-1 text-sm"><strong>公司類型:</strong> ${c.companyType}</p><div class="mt-2 text-sm">${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline">LinkedIn 公司主頁</a>` : '<span>未找到 LinkedIn</span>'}</div></div>`).join('') || '<p>無競爭對手資料</p>';
         ui.resultsActions.classList.remove('hidden');
     }
 }
 
-
 async function saveAnalysisToDrive() {
-    if (!state.currentResults || !state.driveFolderId) return;
+    if (!state.currentResults || !state.driveFolderId) {
+        showAlert('無法儲存', '請先生成報告並確保已設定 Google Drive 資料夾。', 'warning');
+        return;
+    }
     const metadata = { name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`, mimeType: 'application/json', parents: [state.driveFolderId] };
     const boundary = 'foo_bar_baz';
     const multipartRequestBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ inputs: { keyword: document.getElementById('core-keyword').value.trim(), market: document.getElementById('target-market').value, model: document.querySelector('input[name="business-model"]:checked').value }, results: state.currentResults })}\r\n--${boundary}--`;
@@ -445,13 +423,14 @@ async function saveAnalysisToDrive() {
         await gapi.client.request({ path: '/upload/drive/v3/files', method: 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' }, body: multipartRequestBody });
         showAlert('儲存成功', '分析報告已儲存至您的 Google Drive。', 'success');
         loadAnalysisHistory();
-    } catch (e) {
-        showAlert('儲存失敗', '無法將報告儲存至 Google Drive。', 'error');
-    }
+    } catch (e) { showAlert('儲存失敗', '無法將報告儲存至 Google Drive。', 'error'); }
 }
 
 async function loadAnalysisHistory() {
-    if (!state.driveFolderId) return;
+    if (!state.driveFolderId) {
+        ui.historyList.innerHTML = '<p class="text-gray-500">請先在設定中指定一個 Google Drive 資料夾名稱並儲存。</p>';
+        return;
+    }
     const response = await gapi.client.drive.files.list({ q: `'${state.driveFolderId}' in parents and trashed=false`, fields: 'files(id, name, createdTime)', orderBy: 'createdTime desc' });
     const files = response.result.files;
     ui.historyList.innerHTML = '';
@@ -462,9 +441,7 @@ async function loadAnalysisHistory() {
             fileEl.innerHTML = `<div><p class="font-semibold">${file.name.replace('.json', '')}</p><p class="text-sm text-gray-500">儲存於: ${new Date(file.createdTime).toLocaleDateString()}</p></div><div><button data-id="${file.id}" class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">載入</button></div>`;
             ui.historyList.appendChild(fileEl);
         });
-    } else {
-        ui.historyList.innerHTML = '<p class="text-gray-500">沒有歷史紀錄。</p>';
-    }
+    } else { ui.historyList.innerHTML = '<p class="text-gray-500">此資料夾中沒有歷史紀錄。</p>'; }
 }
 
 async function handleHistoryAction(e) {
@@ -477,9 +454,7 @@ async function handleHistoryAction(e) {
             renderPartialResults('competitors');
             document.querySelector('.tab-btn[data-tab="results"]').click();
             showAlert('紀錄已載入', '成功從歷史紀錄載入分析報告。', 'info');
-        } catch (error) {
-            showAlert('載入失敗', '無法載入所選的歷史紀錄。', 'error');
-        }
+        } catch (error) { showAlert('載入失敗', '無法載入所選的歷史紀錄。', 'error'); }
     }
 }
 
@@ -491,7 +466,7 @@ function handleResultAction(e) {
 function handleTabSwitch(e) {
     const target = e.target.closest('.tab-btn');
     if (target) {
-        if (target.closest('#results-tabs-container')) {
+        if (target.classList.contains('result-tab-btn')) {
             const tab = target.dataset.resultTab;
             document.querySelectorAll('.result-tab-btn').forEach(b => b.classList.remove('active'));
             target.classList.add('active');
@@ -512,11 +487,12 @@ function exportToExcel() {
     const wb = XLSX.utils.book_new();
     const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords);
     XLSX.utils.book_append_sheet(wb, keywordsSheet, "A_關鍵字分析");
-
-    const competitorsSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '業務摘要': c.summary, '網站': c.websiteUrl, '公司類型': c.companyType, 'LinkedIn': c.linkedinUrl }));
+    const competitorsSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '業務摘要': c.summary, '網站': c.websiteUrl }));
     const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
-    XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_C_競品綜合分析");
-    
+    XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_競爭對手網站");
+    const linkedinSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '公司類型': c.companyType, 'LinkedIn': c.linkedinUrl }));
+    const linkedinSheet = XLSX.utils.json_to_sheet(linkedinSheetData);
+    XLSX.utils.book_append_sheet(wb, linkedinSheet, "C_LinkedIn分析");
     XLSX.writeFile(wb, `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`);
 }
 
@@ -538,7 +514,6 @@ function safeJsonParse(str) {
         throw new Error("AI 回應的資料格式錯誤，無法解析。");
     }
 }
-
 </script>
 </body>
 </html>
