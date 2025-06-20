@@ -9,7 +9,6 @@
     <script src="https://accounts.google.com/gsi/client"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
     <style>
-        /* Custom Styles for a Polished Look */
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
         .tab.active { border-color: #4f46e5; background-color: #eef2ff; color: #4338ca; }
         .panel { display: none; }
@@ -22,7 +21,6 @@
 </head>
 <body class="bg-gray-100">
 
-    <!-- Header -->
     <header class="bg-white shadow-md">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-gray-800">市場情資與競品分析平台</h1>
@@ -36,16 +34,14 @@
             </div>
         </div>
     </header>
+    
+    <div id="alert-container" class="sticky top-0 z-50 p-4"></div>
 
-    <!-- Main Content -->
     <main class="container mx-auto px-6 py-8">
-        <!-- App Container -->
         <div id="app-container" class="locked">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 
-                <!-- Left Panel: Controls & Settings -->
                 <div class="lg:col-span-1 space-y-6">
-                    <!-- API Settings -->
                     <section id="settings-section" class="bg-white p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-bold mb-4">API & 應用程式設定</h2>
                         <div class="space-y-4">
@@ -61,7 +57,7 @@
                                 <label for="ai-provider" class="block text-sm font-medium text-gray-700">AI 模型提供商</label>
                                 <select id="ai-provider" class="mt-1 w-full p-2 border rounded-md">
                                     <option value="gemini">Google Gemini</option>
-                                    <option value="monica">Monica (Coming Soon)</option>
+                                    <option value="monica" disabled>Monica (即將支援)</option>
                                 </select>
                             </div>
                             <div>
@@ -72,7 +68,6 @@
                         </div>
                     </section>
                     
-                    <!-- Analysis Input -->
                     <section id="analysis-input-section" class="bg-white p-6 rounded-lg shadow-lg locked">
                          <h2 class="text-xl font-bold mb-4">分析目標</h2>
                          <div class="space-y-4">
@@ -83,11 +78,11 @@
                             <div>
                                 <label for="target-market" class="block text-sm font-medium text-gray-700">目標市場</label>
                                 <select id="target-market" class="mt-1 w-full p-2 border rounded-md">
-                                    <option value="us|en">美國 (English)</option>
-                                    <option value="jp|ja">日本 (日本語)</option>
-                                    <option value="tw|zh-TW">台灣 (繁體中文)</option>
-                                    <option value="de|de">德國 (Deutsch)</option>
-                                    <option value="fr|fr">法國 (Français)</option>
+                                    <option value="us|en|美國">美國 (English)</option>
+                                    <option value="jp|ja|日本">日本 (日本語)</option>
+                                    <option value="tw|zh-TW|台灣">台灣 (繁體中文)</option>
+                                    <option value="de|de|德國">德國 (Deutsch)</option>
+                                    <option value="fr|fr|法國">法國 (Français)</option>
                                 </select>
                             </div>
                              <div>
@@ -102,7 +97,6 @@
                     </section>
                 </div>
 
-                <!-- Right Panel: Results & History -->
                 <div class="lg:col-span-2 space-y-6">
                     <div class="bg-white rounded-lg shadow-lg">
                         <div class="flex border-b">
@@ -110,14 +104,19 @@
                             <button data-tab="history" class="tab-btn tab flex-1 p-4 font-semibold">歷史紀錄</button>
                         </div>
 
-                        <!-- Results Panel -->
                         <div id="results-panel" class="panel active p-6">
                            <div id="results-content" class="min-h-[400px]">
-                                <div id="loading-indicator" class="hidden flex flex-col items-center justify-center h-full">
-                                    <div class="spinner"></div>
-                                    <p id="loading-status" class="mt-4 text-gray-600 font-medium">正在準備分析...</p>
+                                <div id="loading-indicator" class="flex flex-col items-center justify-center h-full">
+                                    <p id="loading-status" class="mt-4 text-gray-600 font-medium">請先完成左側設定並點擊開始分析</p>
                                 </div>
-                               <div id="results-tabs-container"></div>
+                               <div id="results-tabs-container" class="hidden">
+                                    <div class="flex border-b">
+                                        <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">A. 關鍵字分析</button>
+                                        <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">B & C. 競品分析</button>
+                                    </div>
+                                    <div id="keywords-result-panel" class="result-panel active p-4"></div>
+                                    <div id="competitors-result-panel" class="result-panel p-4"></div>
+                               </div>
                            </div>
                            <div id="results-actions" class="hidden mt-4 flex gap-4">
                                <button id="save-analysis-btn" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700">儲存本次分析</button>
@@ -125,7 +124,6 @@
                            </div>
                         </div>
 
-                        <!-- History Panel -->
                         <div id="history-panel" class="panel p-6 min-h-[400px]">
                             <div id="history-list" class="space-y-4">
                                 <p class="text-gray-500">沒有歷史紀錄。</p>
@@ -135,7 +133,6 @@
                 </div>
             </div>
         </div>
-
     </main>
 <script>
 // --- Client-Side Application Logic ---
@@ -159,9 +156,7 @@ const state = {
 };
 
 const CONFIG = {
-    // IMPORTANT: Replace with your actual Google Cloud Project's Client ID
-    CLIENT_ID: "733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com",
-    // Scopes requested by the application
+    CLIENT_ID: "YOUR_GOOGLE_CLOUD_CLIENT_ID.apps.googleusercontent.com",
     SCOPES: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
     DRIVE_FOLDER_NAME: "MarketingAnalysisTool_Data"
 };
@@ -170,10 +165,8 @@ const CONFIG = {
 const ui = {
     authorizeButton: document.getElementById('authorize_button'),
     signOutButton: document.getElementById('signout_button'),
-    authContainer: document.getElementById('auth-container'),
     userProfile: document.getElementById('user-profile'),
     appContainer: document.getElementById('app-container'),
-    settingsSection: document.getElementById('settings-section'),
     analysisSection: document.getElementById('analysis-input-section'),
     saveSettingsBtn: document.getElementById('save-settings-btn'),
     startAnalysisBtn: document.getElementById('start-analysis-btn'),
@@ -186,7 +179,6 @@ const ui = {
 
 // --- 3. Initialization ---
 window.onload = () => {
-    // Load Google's API client and Identity Services scripts
     gapi.load('client', gapiLoaded);
     const gisScript = document.createElement('script');
     gisScript.src = 'https://accounts.google.com/gsi/client';
@@ -194,8 +186,6 @@ window.onload = () => {
     gisScript.defer = true;
     gisScript.onload = gisLoaded;
     document.body.appendChild(gisScript);
-
-    // Setup event listeners
     setupEventListeners();
 };
 
@@ -204,33 +194,13 @@ function setupEventListeners() {
     ui.signOutButton.onclick = handleSignOutClick;
     ui.saveSettingsBtn.onclick = handleSaveSettings;
     ui.startAnalysisBtn.onclick = startAnalysisWorkflow;
-
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tab = btn.dataset.tab;
-            // Manage button styles
-            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            // Manage panel visibility
-            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(`${tab}-panel`).classList.add('active');
-        });
-    });
-    
-    // Delegated event listeners for dynamically created content
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', handleTabSwitch));
     document.getElementById('history-list').addEventListener('click', handleHistoryAction);
     document.getElementById('results-actions').addEventListener('click', handleResultAction);
 }
 
-
 // --- 4. Authentication & Authorization ---
-function gapiLoaded() {
-    gapi.client.init({}).then(() => {
-        state.gapiReady = true;
-        maybeEnableAuthButton();
-    });
-}
-
+function gapiLoaded() { gapi.client.init({}).then(() => { state.gapiReady = true; checkAuthReady(); }); }
 function gisLoaded() {
     state.tokenClient = google.accounts.oauth2.initTokenClient({
         client_id: CONFIG.CLIENT_ID,
@@ -238,20 +208,12 @@ function gisLoaded() {
         callback: gisInCallback,
     });
     state.gisReady = true;
-    maybeEnableAuthButton();
+    checkAuthReady();
 }
-
-function maybeEnableAuthButton() {
-    if (state.gapiReady && state.gisReady) {
-        ui.authorizeButton.classList.remove('hidden');
-    }
-}
+function checkAuthReady() { if (state.gapiReady && state.gisReady) ui.authorizeButton.classList.remove('hidden'); }
 
 function gisInCallback(resp) {
-    if (resp.error) {
-        showAlert('Authentication Error', resp.error, 'error');
-        return;
-    }
+    if (resp.error) { showAlert('認證錯誤', resp.error, 'error'); return; }
     state.accessToken = resp;
     gapi.client.setToken(state.accessToken);
     handleSuccessfulLogin();
@@ -271,13 +233,11 @@ async function handleSuccessfulLogin() {
     ui.userProfile.classList.add('flex');
     ui.appContainer.classList.remove('locked');
 
-    // Fetch and display user profile
     const profile = await gapi.client.oauth2.userinfo.get();
     state.userProfile = profile.result;
     document.getElementById('user-avatar').src = state.userProfile.picture;
     document.getElementById('user-name').textContent = state.userProfile.given_name || state.userProfile.name;
 
-    // Load saved settings and check for Drive folder
     loadSettingsFromLocalStorage();
     await setupGoogleDrive();
     loadAnalysisHistory();
@@ -290,7 +250,6 @@ function handleSignOutClick() {
             gapi.client.setToken('');
             state.accessToken = null;
             state.userProfile = null;
-            
             ui.userProfile.classList.add('hidden');
             ui.authorizeButton.classList.remove('hidden');
             ui.appContainer.classList.add('locked');
@@ -298,7 +257,6 @@ function handleSignOutClick() {
         });
     }
 }
-
 
 // --- 5. API Settings ---
 function handleSaveSettings() {
@@ -308,22 +266,14 @@ function handleSaveSettings() {
     const aiApiKey = document.getElementById('ai-api-key').value.trim();
     
     if (!googleApiKey || !searchEngineId || !aiApiKey) {
-        showAlert('Information Missing', 'Please fill in all API key and ID fields.', 'warning');
+        showAlert('資訊不完整', '請填寫所有 API 金鑰與 ID 欄位。', 'warning');
         return;
     }
-
-    state.apiKeys = {
-        google: googleApiKey,
-        searchEngineId: searchEngineId,
-        aiProvider: aiProvider,
-        ai: aiApiKey
-    };
-    
-    // "Encrypt" by base64 encoding for simple obfuscation in local storage
+    state.apiKeys = { google: googleApiKey, searchEngineId: searchEngineId, aiProvider: aiProvider, ai: aiApiKey };
     localStorage.setItem('marketingToolApiKeys', btoa(JSON.stringify(state.apiKeys)));
     state.isApiReady = true;
     ui.analysisSection.classList.remove('locked');
-    showAlert('Settings Saved', 'API settings have been saved and activated.', 'success');
+    showAlert('設定已儲存', 'API 已設定完成並啟用。', 'success');
 }
 
 function loadSettingsFromLocalStorage() {
@@ -333,151 +283,91 @@ function loadSettingsFromLocalStorage() {
             const decodedKeys = JSON.parse(atob(savedKeys));
             state.apiKeys = decodedKeys;
             state.isApiReady = true;
-            
-            // Populate fields
             document.getElementById('google-api-key').value = state.apiKeys.google || '';
             document.getElementById('search-engine-id').value = state.apiKeys.searchEngineId || '';
             document.getElementById('ai-provider').value = state.apiKeys.aiProvider || 'gemini';
             document.getElementById('ai-api-key').value = state.apiKeys.ai || '';
-
             ui.analysisSection.classList.remove('locked');
         } catch (e) {
-            console.error("Failed to parse saved API keys:", e);
-            localStorage.removeItem('marketingToolApiKeys');
+            console.error("無法解析已儲存的 API 金鑰:", e);
         }
     }
 }
-
 
 // --- 6. Google Drive Integration ---
 async function setupGoogleDrive() {
     await gapi.client.load('drive', 'v3');
     const response = await gapi.client.drive.files.list({
         q: `name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: 'files(id, name)'
+        fields: 'files(id)'
     });
-    
-    if (response.result.files.length > 0) {
+    if (response.result.files && response.result.files.length > 0) {
         state.driveFolderId = response.result.files[0].id;
     } else {
-        const fileMetadata = {
-            'name': CONFIG.DRIVE_FOLDER_NAME,
-            'mimeType': 'application/vnd.google-apps.folder'
-        };
-        const createResponse = await gapi.client.drive.files.create({
-            resource: fileMetadata,
-            fields: 'id'
-        });
+        const fileMetadata = { 'name': CONFIG.DRIVE_FOLDER_NAME, 'mimeType': 'application/vnd.google-apps.folder' };
+        const createResponse = await gapi.client.drive.files.create({ resource: fileMetadata, fields: 'id' });
         state.driveFolderId = createResponse.result.id;
     }
 }
 
-
 // --- 7. Main Analysis Workflow ---
 async function startAnalysisWorkflow() {
-    if (!state.isApiReady) {
-        showAlert('API Not Ready', 'Please save your API settings first.', 'error');
-        return;
-    }
-
+    if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); return; }
     const coreKeyword = document.getElementById('core-keyword').value.trim();
-    if (!coreKeyword) {
-        showAlert('Input Required', 'Please enter an industry, brand, or product keyword.', 'warning');
-        return;
-    }
+    if (!coreKeyword) { showAlert('需要輸入', '請輸入行業、品牌或產品關鍵字。', 'warning'); return; }
 
-    ui.loadingIndicator.classList.remove('hidden');
-    ui.resultsContainer.innerHTML = ''; // Clear previous results
-    ui.resultsActions.classList.add('hidden');
-
+    ui.loadingIndicator.style.display = 'flex';
+    ui.loadingStatus.textContent = '準備中...';
+    ui.resultsContainer.classList.add('hidden');
+    
     try {
-        // Step 1: Generate Keywords
         ui.loadingStatus.textContent = '步驟 1/3: 正在生成行業關鍵字...';
-        const keywordData = await getAiKeywordAnalysis();
-        state.currentResults = { keywords: keywordData.keywords || [] };
-        
-        // Step 2: Competitor Analysis
+        const keywordsResponse = await getAiKeywordAnalysis();
+        state.currentResults = { keywords: keywordsResponse.keywords || [] };
+        renderPartialResults('keywords');
+
         ui.loadingStatus.textContent = '步驟 2/3: 正在搜尋競爭對手...';
         const searchResults = await performGoogleSearch(state.currentResults.keywords);
         
         ui.loadingStatus.textContent = '步驟 3/3: 正在分析競爭對手資訊...';
-        const competitorData = await getAiCompetitorAnalysis(searchResults);
-        state.currentResults.competitors = competitorData.competitors || [];
+        const competitorsResponse = await getAiCompetitorAnalysis(searchResults);
+        state.currentResults.competitors = competitorsResponse.competitors || [];
 
-        // Step 3: Render results
-        renderAnalysisResults(state.currentResults);
+        renderPartialResults('competitors');
+        showAlert('分析完成', '所有報告皆已生成完畢。', 'success');
 
     } catch (error) {
-        console.error("Analysis failed:", error);
-        showAlert('Analysis Failed', `An error occurred: ${error.message}`, 'error');
+        console.error("分析失敗:", error);
+        showAlert('分析失敗', `發生錯誤: ${error.message}`, 'error');
     } finally {
-        ui.loadingIndicator.classList.add('hidden');
+        ui.loadingIndicator.style.display = 'none';
     }
 }
 
 // --- 8. API Call Functions ---
 async function getAiKeywordAnalysis() {
     const marketInfo = document.getElementById('target-market').value.split('|');
-    const prompt = `
-        You are a senior SEO and market analysis expert specializing in the ${marketInfo[0]} market.
-        Please generate a detailed keyword analysis report based on the following criteria:
-        - Core Topic: "${document.getElementById('core-keyword').value}"
-        - Business Model: "${document.querySelector('input[name="business-model"]:checked').value}"
-        - Target Language: "${marketInfo[1]}"
-        
-        Provide 20 relevant keywords, including short-tail, mid-tail, and long-tail variations. For each keyword, assess its "Search Volume Level" (High, Medium, Low) and "Keyword Type" (e.g., Brand, Product, Comparison, Question, Informational).
-        
-        Return the response strictly in the following JSON format:
-        { "keywords": [{ "keyword": "...", "volume": "High", "type": "Product" }, ...] }`;
-
-    const response = await callGeminiAPI(prompt);
-    return JSON.parse(response);
+    const prompt = `你是一位專精於 ${marketInfo[2]} 市場的資深SEO與市場分析專家。請針對以下條件，生成一份詳細的關鍵字分析報告：- 核心主題: "${document.getElementById('core-keyword').value}" - 商業模式: "${document.querySelector('input[name="business-model"]:checked').value}" - 目標語言: "${marketInfo[1]}" 請提供 50 個最相關的關鍵字，盡可能涵蓋短尾、中尾和長尾關鍵字。對於每個關鍵字，請評估其「搜尋量級」（高、中、低）和「關鍵字類型」（例如：品牌字、產品字、比較字、問題字、資訊字）。請嚴格以 JSON 格式返回，不要包含任何 json 標籤或註解，格式如下：{ "keywords": [{ "keyword": "...", "volume": "高", "type": "產品字" }, ...] }`;
+    return safeJsonParse(await callGeminiAPI(prompt));
 }
 
 async function performGoogleSearch(keywords) {
     if (!keywords || keywords.length === 0) return [];
-    
-    // Select top 3 high-volume keywords for the query
-    const query = keywords.filter(k => k.volume === 'High').slice(0, 3).map(k => k.keyword).join(' OR ');
+    const query = keywords.filter(k => k.volume === '高').slice(0, 3).map(k => `"${k.keyword}"`).join(' OR ');
     if (!query) return [];
-
     const marketInfo = document.getElementById('target-market').value.split('|');
-    
     const response = await gapi.client.request({
         'path': `https://customsearch.googleapis.com/customsearch/v1`,
-        'params': {
-            'key': state.apiKeys.google,
-            'cx': state.apiKeys.searchEngineId,
-            'q': query,
-            'cr': `country${marketInfo[0].toUpperCase()}`
-        }
+        'params': { 'key': state.apiKeys.google, 'cx': state.apiKeys.searchEngineId, 'q': query, 'cr': `country${marketInfo[0].toUpperCase()}` }
     });
-
     return response.result.items || [];
 }
 
 async function getAiCompetitorAnalysis(searchResults) {
     if (searchResults.length === 0) return { competitors: [] };
-
     const context = searchResults.slice(0, 10).map(item => `Title: ${item.title}\nURL: ${item.link}\nSnippet: ${item.snippet}`).join('\n\n');
-    
-    const prompt = `
-        You are a market intelligence analyst. Below are Google search results for "${document.getElementById('core-keyword').value}". Please analyze them and identify the 5 most significant competitors.
-        
-        For each competitor, complete the following tasks:
-        1. Identify their official brand name and main website URL.
-        2. Summarize their core business in Traditional Chinese (max 30 words) based on their website snippet.
-        3. Find their official LinkedIn company page URL. Return "N/A" if not found.
-        4. Classify their business into one of the following types: [SaaS, Hardware Manufacturer, Consulting Service, Retail E-commerce, Agency, Content Platform].
-        
-        Return the response strictly in the following JSON format:
-        { "competitors": [{ "brandName": "...", "websiteUrl": "...", "summary": "...", "linkedinUrl": "...", "companyType": "SaaS" }, ...] }
-        
-        Context from search results:
-        ${context}`;
-
-    const response = await callGeminiAPI(prompt);
-    return JSON.parse(response);
+    const prompt = `你是一位市場情報分析師。以下是針對 "${document.getElementById('core-keyword').value}" 的 Google 搜尋結果。請從中分析並識別出 5 個最主要的競爭對手。對於每個競爭對手，完成以下任務：1. 識別其官方品牌名稱和主要網站 URL。2. 根據其網站摘要，用繁體中文總結其核心業務（不超過 30 字）。3. 在 LinkedIn 上尋找其官方公司頁面 URL。如果找不到，請返回 "N/A"。4. 根據其業務性質，將其分類為以下類型之一：[SaaS, 硬體製造, 顧問服務, 零售電商, 代理商, 內容平台]。請嚴格以 JSON 格式返回，不要包含任何 json 標籤或註解，格式如下：{ "competitors": [{ "brandName": "...", "websiteUrl": "...", "summary": "...", "linkedinUrl": "...", "companyType": "SaaS" }, ...] } 搜尋結果上下文:\n${context}`;
+    return safeJsonParse(await callGeminiAPI(prompt));
 }
 
 async function callGeminiAPI(prompt) {
@@ -485,132 +375,91 @@ async function callGeminiAPI(prompt) {
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
     });
     if (!response.ok) {
         const errorBody = await response.json();
         throw new Error(`Gemini API Error: ${errorBody.error.message}`);
     }
     const data = await response.json();
-    // Clean the response text to get valid JSON
-    let text = data.candidates[0].content.parts[0].text;
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-    return text;
+    if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+        throw new Error("Gemini API 回應格式無效。");
+    }
+    return data.candidates[0].content.parts[0].text;
 }
-
 
 // --- 9. Rendering, History & Export ---
-function renderAnalysisResults(results) {
-    let html = `
-        <div class="flex border-b">
-            <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">關鍵字分析</button>
-            <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">競爭對手</button>
-        </div>
-        <div id="keywords-result-panel" class="result-panel active p-4">
-            <table class="w-full text-left">
-                <thead><tr class="border-b"><th class="py-2">關鍵字</th><th>搜尋量級</th><th>類型</th></tr></thead>
-                <tbody>${results.keywords.map(k => `<tr><td class="py-2">${k.keyword}</td><td>${k.volume}</td><td>${k.type}</td></tr>`).join('')}</tbody>
-            </table>
-        </div>
-        <div id="competitors-result-panel" class="result-panel p-4 space-y-4">
-             ${results.competitors.map(c => `
-                <div class="p-3 border rounded-lg">
-                    <p class="font-bold text-lg">${c.brandName}</p>
-                    <p class="text-sm text-gray-600">${c.summary}</p>
-                    <p class="mt-2 text-sm"><strong>類型:</strong> ${c.companyType}</p>
-                    <div class="mt-2 text-sm flex gap-4">
-                        <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline">網站</a>
-                        ${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline">LinkedIn</a>` : ''}
+function renderPartialResults(type) {
+    ui.resultsContainer.classList.remove('hidden');
+    if (type === 'keywords') {
+        const panel = document.getElementById('keywords-result-panel');
+        const groupedKeywords = (state.currentResults.keywords || []).reduce((acc, kw) => {
+            if (!acc[kw.type]) acc[kw.type] = [];
+            acc[kw.type].push(kw);
+            return acc;
+        }, {});
+        
+        const volumeColorMap = { '高': 'bg-red-200 text-red-800', '中': 'bg-yellow-200 text-yellow-800', '低': 'bg-green-200 text-green-800' };
+
+        panel.innerHTML = Object.entries(groupedKeywords).map(([type, kws]) => `
+            <div class="mb-6">
+                <h4 class="font-bold text-lg mb-3 text-gray-700">${type}</h4>
+                <div class="flex flex-wrap gap-2">
+                    ${kws.map(kw => `<span class="px-3 py-1 rounded-full text-sm font-medium ${volumeColorMap[kw.volume] || 'bg-gray-200'}">${kw.keyword}</span>`).join('')}
+                </div>
+            </div>
+        `).join('') || '<p>無關鍵字資料</p>';
+    }
+    
+    if (type === 'competitors') {
+        const panel = document.getElementById('competitors-result-panel');
+        panel.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            ${(state.currentResults.competitors || []).map(c => `
+                <div class="p-4 border rounded-lg bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <h4 class="font-bold text-xl text-indigo-700">${c.brandName}</h4>
+                    <p class="text-sm text-gray-500 mt-1 mb-3">${c.companyType}</p>
+                    <p class="text-gray-700 mb-4">${c.summary}</p>
+                    <div class="mt-auto flex gap-4 border-t pt-3">
+                        <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">官方網站</a>
+                        ${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline font-medium">LinkedIn</a>` : '<span class="text-gray-400">無 LinkedIn</span>'}
                     </div>
                 </div>
-             `).join('')}
-        </div>
-    `;
-    ui.resultsContainer.innerHTML = html;
-    ui.resultsActions.classList.remove('hidden');
-
-    // Add event listeners for the new result tabs
-    document.querySelectorAll('.result-tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tab = btn.dataset.resultTab;
-            document.querySelectorAll('.result-tab-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            document.querySelectorAll('.result-panel').forEach(p => p.classList.remove('active'));
-            document.getElementById(`${tab}-result-panel`).classList.add('active');
-        });
-    });
+            `).join('')}
+        </div>` || '<p>無競爭對手資料</p>';
+        
+        // Hide individual B and C tabs, as they are now combined.
+        document.querySelector('.result-tab-btn[data-result-tab="competitors"]').textContent = 'B & C. 競品分析';
+        document.querySelector('.result-tab-btn[data-result-tab="linkedin"]')?.remove();
+        
+        ui.resultsActions.classList.remove('hidden');
+    }
 }
+
 
 async function saveAnalysisToDrive() {
     if (!state.currentResults || !state.driveFolderId) return;
-
-    const metadata = {
-        name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`,
-        mimeType: 'application/json',
-        parents: [state.driveFolderId]
-    };
-    const boundary = '-------314159265358979323846';
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const close_delim = `\r\n--${boundary}--`;
-
-    const multipartRequestBody =
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        JSON.stringify(metadata) +
-        delimiter +
-        'Content-Type: application/json\r\n\r\n' +
-        JSON.stringify({
-            inputs: {
-                keyword: document.getElementById('core-keyword').value.trim(),
-                market: document.getElementById('target-market').value,
-                model: document.querySelector('input[name="business-model"]:checked').value
-            },
-            results: state.currentResults
-        }) +
-        close_delim;
-
+    const metadata = { name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`, mimeType: 'application/json', parents: [state.driveFolderId] };
+    const boundary = 'foo_bar_baz';
+    const multipartRequestBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ inputs: { keyword: document.getElementById('core-keyword').value.trim(), market: document.getElementById('target-market').value, model: document.querySelector('input[name="business-model"]:checked').value }, results: state.currentResults })}\r\n--${boundary}--`;
     try {
-        await gapi.client.request({
-            path: '/upload/drive/v3/files',
-            method: 'POST',
-            params: { uploadType: 'multipart' },
-            headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
-            body: multipartRequestBody
-        });
-        showAlert('Save Successful', 'Analysis has been saved to your Google Drive.', 'success');
-        loadAnalysisHistory(); // Refresh history
+        await gapi.client.request({ path: '/upload/drive/v3/files', method: 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' }, body: multipartRequestBody });
+        showAlert('儲存成功', '分析報告已儲存至您的 Google Drive。', 'success');
+        loadAnalysisHistory();
     } catch (e) {
-        console.error(e);
-        showAlert('Save Failed', 'Could not save the analysis to Google Drive.', 'error');
+        showAlert('儲存失敗', '無法將報告儲存至 Google Drive。', 'error');
     }
 }
 
 async function loadAnalysisHistory() {
     if (!state.driveFolderId) return;
-
-    const response = await gapi.client.drive.files.list({
-        q: `'${state.driveFolderId}' in parents and trashed=false`,
-        fields: 'files(id, name, createdTime)',
-        orderBy: 'createdTime desc'
-    });
-    
+    const response = await gapi.client.drive.files.list({ q: `'${state.driveFolderId}' in parents and trashed=false`, fields: 'files(id, name, createdTime)', orderBy: 'createdTime desc' });
     const files = response.result.files;
     ui.historyList.innerHTML = '';
     if (files && files.length > 0) {
         files.forEach(file => {
             const fileEl = document.createElement('div');
             fileEl.className = 'border p-3 rounded-lg flex justify-between items-center';
-            fileEl.innerHTML = `
-                <div>
-                    <p class="font-semibold">${file.name.replace('.json', '')}</p>
-                    <p class="text-sm text-gray-500">Saved on: ${new Date(file.createdTime).toLocaleDateString()}</p>
-                </div>
-                <div>
-                    <button data-id="${file.id}" class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">載入</button>
-                </div>
-            `;
+            fileEl.innerHTML = `<div><p class="font-semibold">${file.name.replace('.json', '')}</p><p class="text-sm text-gray-500">儲存於: ${new Date(file.createdTime).toLocaleDateString()}</p></div><div><button data-id="${file.id}" class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">載入</button></div>`;
             ui.historyList.appendChild(fileEl);
         });
     } else {
@@ -622,69 +471,72 @@ async function handleHistoryAction(e) {
     if (e.target.classList.contains('load-history-btn')) {
         const fileId = e.target.dataset.id;
         try {
-            const response = await gapi.client.drive.files.get({
-                fileId: fileId,
-                alt: 'media'
-            });
-            const data = response.result;
-            state.currentResults = data.results;
-            renderAnalysisResults(data.results);
-            
-            // Switch to results tab
+            const response = await gapi.client.drive.files.get({ fileId: fileId, alt: 'media' });
+            state.currentResults = response.result.results;
+            renderPartialResults('keywords');
+            renderPartialResults('competitors');
             document.querySelector('.tab-btn[data-tab="results"]').click();
-            showAlert('History Loaded', 'Successfully loaded analysis from history.', 'info');
+            showAlert('紀錄已載入', '成功從歷史紀錄載入分析報告。', 'info');
         } catch (error) {
-            console.error(error);
-            showAlert('Load Failed', 'Could not load the selected history item.', 'error');
+            showAlert('載入失敗', '無法載入所選的歷史紀錄。', 'error');
         }
     }
 }
 
 function handleResultAction(e) {
-    if (e.target.id === 'save-analysis-btn') {
-        saveAnalysisToDrive();
-    } else if (e.target.id === 'export-excel-btn') {
-        exportToExcel();
+    if (e.target.id === 'save-analysis-btn') saveAnalysisToDrive();
+    else if (e.target.id === 'export-excel-btn') exportToExcel();
+}
+
+function handleTabSwitch(e) {
+    const target = e.target.closest('.tab-btn');
+    if (target) {
+        if (target.closest('#results-tabs-container')) {
+            const tab = target.dataset.resultTab;
+            document.querySelectorAll('.result-tab-btn').forEach(b => b.classList.remove('active'));
+            target.classList.add('active');
+            document.querySelectorAll('.result-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${tab}-result-panel`).classList.add('active');
+        } else {
+            const tab = target.dataset.tab;
+            document.querySelectorAll('.tab-btn:not(.result-tab-btn)').forEach(b => b.classList.remove('active'));
+            target.classList.add('active');
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${tab}-panel`).classList.add('active');
+        }
     }
 }
 
 function exportToExcel() {
     if (!state.currentResults) return;
-
     const wb = XLSX.utils.book_new();
-    
-    // Keywords sheet
-    const wsKeywords = XLSX.utils.json_to_sheet(state.currentResults.keywords);
-    XLSX.utils.book_append_sheet(wb, wsKeywords, "關鍵字分析");
+    const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords);
+    XLSX.utils.book_append_sheet(wb, keywordsSheet, "A_關鍵字分析");
 
-    // Competitors sheet
-    const competitorsForSheet = state.currentResults.competitors.map(c => ({
-        '品牌名稱': c.brandName,
-        '業務摘要': c.summary,
-        '類型': c.companyType,
-        '網站': c.websiteUrl,
-        'LinkedIn': c.linkedinUrl,
-    }));
-    const wsCompetitors = XLSX.utils.json_to_sheet(competitorsForSheet);
-    XLSX.utils.book_append_sheet(wb, wsCompetitors, "競爭對手分析");
+    const competitorsSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '業務摘要': c.summary, '網站': c.websiteUrl, '公司類型': c.companyType, 'LinkedIn': c.linkedinUrl }));
+    const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
+    XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_C_競品綜合分析");
     
-    const filename = `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`;
-    XLSX.writeFile(wb, filename);
+    XLSX.writeFile(wb, `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`);
 }
 
-// --- 10. Utility Functions ---
 function showAlert(title, message, type = 'info') {
-    const colors = {
-        info: 'bg-blue-100 border-blue-500 text-blue-700',
-        success: 'bg-green-100 border-green-500 text-green-700',
-        warning: 'bg-yellow-100 border-yellow-500 text-yellow-700',
-        error: 'bg-red-100 border-red-500 text-red-700',
-    };
+    const colors = { info: 'bg-blue-100 border-blue-500 text-blue-700', success: 'bg-green-100 border-green-500 text-green-700', warning: 'bg-yellow-100 border-yellow-500 text-yellow-700', error: 'bg-red-100 border-red-500 text-red-700' };
     const alertEl = document.createElement('div');
     alertEl.className = `p-4 mb-4 rounded-md shadow-lg border-l-4 ${colors[type]}`;
-    alertEl.innerHTML = `<div class="flex"><div class="ml-3"><p class="font-bold">${title}</p><p class="text-sm">${message}</p></div></div>`;
+    alertEl.innerHTML = `<div class="flex"><div class="ml-3"><p class="font-bold">${title}</p><p class="text-sm">${message}</p></div><button class="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-lg inline-flex h-8 w-8" onclick="this.parentElement.parentElement.remove()">×</button></div>`;
     document.getElementById('alert-container').prepend(alertEl);
-    setTimeout(() => alertEl.remove(), 5000);
+    setTimeout(() => alertEl.remove(), 6000);
+}
+
+function safeJsonParse(str) {
+    try {
+        const cleanStr = str.replace(/```json/g, '').replace(/```/g, '').trim();
+        return JSON.parse(cleanStr);
+    } catch (e) {
+        console.error("JSON 解析失敗:", str);
+        throw new Error("AI 回應的資料格式錯誤，無法解析。");
+    }
 }
 
 </script>
