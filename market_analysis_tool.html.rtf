@@ -1,827 +1,692 @@
-{\rtf1\ansi\ansicpg950\cocoartf2822
-\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fnil\fcharset0 Menlo-Regular;\f1\fnil\fcharset136 PingFangTC-Regular;\f2\fswiss\fcharset0 ArialMT;
-}
-{\colortbl;\red255\green255\blue255;\red70\green137\blue204;\red23\green24\blue24;\red140\green211\blue254;
-\red202\green202\blue202;\red109\green109\blue109;\red194\green126\blue101;\red109\green115\blue120;\red212\green212\blue212;
-\red113\green192\blue131;\red167\green197\blue152;\red183\green111\blue247;\red54\green192\blue160;\red16\green60\blue192;
-\red246\green124\blue48;\red163\green79\blue131;}
-{\*\expandedcolortbl;;\cssrgb\c33725\c61176\c83922;\cssrgb\c11765\c12157\c12549;\cssrgb\c61176\c86275\c99608;
-\cssrgb\c83137\c83137\c83137;\cssrgb\c50196\c50196\c50196;\cssrgb\c80784\c56863\c47059;\cssrgb\c50196\c52549\c54510;\cssrgb\c86275\c86275\c86275;
-\cssrgb\c50588\c78824\c58431;\cssrgb\c70980\c80784\c65882;\cssrgb\c77255\c54118\c97647;\cssrgb\c23922\c78824\c69020;\cssrgb\c6667\c33333\c80000;
-\cssrgb\c98039\c56471\c24314;\cssrgb\c70588\c40000\c58431;}
-\paperw11900\paperh16840\margl1440\margr1440\vieww51000\viewh18280\viewkind0
-\deftab720
-\pard\pardeftab720\partightenfactor0
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>市場情資與競品分析平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://accounts.google.com/gsi/client"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+    <style>
+        /* Custom Styles for a Polished Look */
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .tab.active { border-color: #4f46e5; background-color: #eef2ff; color: #4338ca; }
+        .panel { display: none; }
+        .panel.active { display: block; animation: fadeIn 0.5s ease; }
+        .locked { opacity: 0.5; pointer-events: none; }
+        .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 36px; height: 36px; border-radius: 50%; border-left-color: #4f46e5; animation: spin 1s ease infinite; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100">
 
-\f0\fs28 \cf2 \cb3 \expnd0\expndtw0\kerning0
-<!DOCTYPE\cf4  html\cf2 >\cf5 \cb1 \
-\pard\pardeftab720\partightenfactor0
-\cf6 \cb3 <\cf2 html\cf5  \cf4 lang\cf6 =\cf7 "zh-TW"\cf6 >\cf5 \cb1 \
-\cf6 \cb3 <\cf2 head\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 meta\cf5  \cf4 charset\cf6 =\cf7 "UTF-8"\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 meta\cf5  \cf4 name\cf6 =\cf7 "viewport"\cf5  \cf4 content\cf6 =\cf7 "width=device-width, initial-scale=1.0"\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 title\cf6 >
-\f1 \cf5 \'a5\'ab\'b3\'f5\'b1\'a1\'b8\'ea\'bb\'50\'c4\'76\'ab\'7e\'a4\'c0\'aa\'52\'a5\'ad\'a5\'78
-\f0 \cf6 </\cf2 title\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 script\cf5  \cf4 src\cf6 =\cf7 "https://cdn.tailwindcss.com"\cf6 ></\cf2 script\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 script\cf5  \cf4 src\cf6 =\cf7 "https://apis.google.com/js/api.js"\cf6 ></\cf2 script\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 script\cf5  \cf4 src\cf6 =\cf7 "https://accounts.google.com/gsi/client"\cf6 ></\cf2 script\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 script\cf5  \cf4 src\cf6 =\cf7 "https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"\cf6 ></\cf2 script\cf6 >\cf5 \cb1 \
-\cb3     \cf6 <\cf2 style\cf6 >\cf5 \cb1 \
-\cb3         \cf8 /* Custom Styles for a Polished Look */\cf5 \cb1 \
-\cb3         \cf2 body\cf5  \cf9 \{\cf5  \cf4 font-family:\cf5  \cf7 -apple-system\cf9 ,\cf5  \cf7 BlinkMacSystemFont\cf9 ,\cf5  \cf10 "Segoe UI"\cf9 ,\cf5  \cf7 Roboto\cf9 ,\cf5  \cf10 "Helvetica Neue"\cf9 ,\cf5  \cf7 Arial\cf9 ,\cf5  \cf7 sans-serif\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf2 .tab.active\cf5  \cf9 \{\cf5  \cf4 border-color:\cf5  #4f46e5\cf9 ;\cf5  \cf4 background-color:\cf5  #eef2ff\cf9 ;\cf5  \cf4 color:\cf5  #4338ca\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf2 .panel\cf5  \cf9 \{\cf5  \cf4 display:\cf5  \cf7 none\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf2 .panel.active\cf5  \cf9 \{\cf5  \cf4 display:\cf5  \cf7 block\cf9 ;\cf5  \cf4 animation:\cf5  \cf7 fadeIn\cf5  \cf11 0.5s\cf5  \cf7 ease\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf2 .locked\cf5  \cf9 \{\cf5  \cf4 opacity:\cf5  \cf11 0.5\cf9 ;\cf5  \cf4 pointer-events:\cf5  \cf7 none\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf2 .spinner\cf5  \cf9 \{\cf5  \cf4 border:\cf5  \cf11 4px\cf5  \cf7 solid\cf5  \cf7 rgba(\cf11 0\cf9 ,\cf5  \cf11 0\cf9 ,\cf5  \cf11 0\cf9 ,\cf5  \cf11 0.1\cf7 )\cf9 ;\cf5  \cf4 width:\cf5  \cf11 36px\cf9 ;\cf5  \cf4 height:\cf5  \cf11 36px\cf9 ;\cf5  \cf4 border-radius:\cf5  \cf11 50%\cf9 ;\cf5  \cf4 border-left-color:\cf5  #4f46e5\cf9 ;\cf5  \cf4 animation:\cf5  \cf7 spin\cf5  \cf11 1s\cf5  \cf7 ease\cf5  \cf7 infinite\cf9 ;\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf12 @keyframes\cf5  \cf7 fadeIn\cf5  \cf9 \{\cf5  \cf7 from\cf5  \cf9 \{\cf5  \cf4 opacity:\cf5  \cf11 0\cf9 ;\cf5  \cf4 transform:\cf5  \cf7 translateY(\cf11 10px\cf7 )\cf9 ;\cf5  \cf9 \}\cf5  \cf7 to\cf5  \cf9 \{\cf5  \cf4 opacity:\cf5  \cf11 1\cf9 ;\cf5  \cf4 transform:\cf5  \cf7 translateY(\cf11 0\cf7 )\cf9 ;\cf5  \cf9 \}\cf5  \cf9 \}\cf5 \cb1 \
-\cb3         \cf12 @keyframes\cf5  \cf7 spin\cf5  \cf9 \{\cf5  \cf7 to\cf5  \cf9 \{\cf5  \cf4 transform:\cf5  \cf7 rotate(\cf11 360deg\cf7 )\cf9 ;\cf5  \cf9 \}\cf5  \cf9 \}\cf5 \cb1 \
-\cb3     \cf6 </\cf2 style\cf6 >\cf5 \cb1 \
-\cf6 \cb3 </\cf2 head\cf6 >\cf5 \cb1 \
-\cf6 \cb3 <\cf2 body\cf5  \cf4 class\cf6 =\cf7 "bg-gray-100"\cf6 >\cf5 \cb1 \
-\
-\cb3     \cf8 <!-- Header -->\cf5 \cb1 \
-\cb3     \cf6 <\cf2 header\cf5  \cf4 class\cf6 =\cf7 "bg-white shadow-md"\cf6 >\cf5 \cb1 \
-\cb3         \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "container mx-auto px-6 py-4 flex justify-between items-center"\cf6 >\cf5 \cb1 \
-\cb3             \cf6 <\cf2 h1\cf5  \cf4 class\cf6 =\cf7 "text-2xl font-bold text-gray-800"\cf6 >
-\f1 \cf5 \'a5\'ab\'b3\'f5\'b1\'a1\'b8\'ea\'bb\'50\'c4\'76\'ab\'7e\'a4\'c0\'aa\'52\'a5\'ad\'a5\'78
-\f0 \cf6 </\cf2 h1\cf6 >\cf5 \cb1 \
-\cb3             \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "auth-container"\cf6 >\cf5 \cb1 \
-\cb3                 \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "authorize_button"\cf5  \cf4 class\cf6 =\cf7 "hidden bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition"\cf6 >
-\f1 \cf5 \'a8\'cf\'a5\'ce
-\f0  Google 
-\f1 \'b1\'62\'a4\'e1\'b5\'6e\'a4\'4a
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                 \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "user-profile"\cf5  \cf4 class\cf6 =\cf7 "hidden items-center gap-3"\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 img\cf5  \cf4 id\cf6 =\cf7 "user-avatar"\cf5  \cf4 class\cf6 =\cf7 "w-10 h-10 rounded-full"\cf5  \cf4 src\cf6 =\cf7 ""\cf5  \cf4 alt\cf6 =\cf7 "User Avatar"\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 span\cf5  \cf4 id\cf6 =\cf7 "user-name"\cf5  \cf4 class\cf6 =\cf7 "font-semibold text-gray-700"\cf6 ></\cf2 span\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "signout_button"\cf5  \cf4 class\cf6 =\cf7 "text-sm text-gray-500 hover:text-gray-800"\cf6 >
-\f1 \cf5 \'b5\'6e\'a5\'58
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                 \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3     \cf6 </\cf2 header\cf6 >\cf5 \cb1 \
-\
-\cb3     \cf8 <!-- Main Content -->\cf5 \cb1 \
-\cb3     \cf6 <\cf2 main\cf5  \cf4 class\cf6 =\cf7 "container mx-auto px-6 py-8"\cf6 >\cf5 \cb1 \
-\cb3         \cf8 <!-- App Container -->\cf5 \cb1 \
-\cb3         \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "app-container"\cf5  \cf4 class\cf6 =\cf7 "locked"\cf6 >\cf5 \cb1 \
-\cb3             \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "grid grid-cols-1 lg:grid-cols-3 gap-8"\cf6 >\cf5 \cb1 \
-\cb3                 \cb1 \
-\cb3                 \cf8 <!-- Left Panel: Controls & Settings -->\cf5 \cb1 \
-\cb3                 \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "lg:col-span-1 space-y-6"\cf6 >\cf5 \cb1 \
-\cb3                     \cf8 <!-- API Settings -->\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 section\cf5  \cf4 id\cf6 =\cf7 "settings-section"\cf5  \cf4 class\cf6 =\cf7 "bg-white p-6 rounded-lg shadow-lg"\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 <\cf2 h2\cf5  \cf4 class\cf6 =\cf7 "text-xl font-bold mb-4"\cf6 >\cf5 API & 
-\f1 \'c0\'b3\'a5\'ce\'b5\'7b\'a6\'a1\'b3\'5d\'a9\'77
-\f0 \cf6 </\cf2 h2\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "space-y-4"\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "google-api-key"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >\cf5 Google API 
-\f1 \'aa\'f7\'c6\'5f
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 input\cf5  \cf4 type\cf6 =\cf7 "password"\cf5  \cf4 id\cf6 =\cf7 "google-api-key"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf5  \cf4 placeholder\cf6 =\cf7 "
-\f1 \'bd\'d0\'bf\'e9\'a4\'4a\'b1\'7a\'aa\'ba
-\f0  Google API 
-\f1 \'aa\'f7\'c6\'5f
-\f0 "\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "search-engine-id"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >
-\f1 \cf5 \'a5\'69\'b5\'7b\'a6\'a1\'a4\'c6\'b7\'6a\'b4\'4d\'a4\'de\'c0\'ba
-\f0  ID (CX)\cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 input\cf5  \cf4 type\cf6 =\cf7 "text"\cf5  \cf4 id\cf6 =\cf7 "search-engine-id"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf5  \cf4 placeholder\cf6 =\cf7 "
-\f1 \'bd\'d0\'bf\'e9\'a4\'4a\'b1\'7a\'aa\'ba
-\f0  CX ID"\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                              \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "ai-provider"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >\cf5 AI 
-\f1 \'bc\'d2\'ab\'ac\'b4\'a3\'a8\'d1\'b0\'d3
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 select\cf5  \cf4 id\cf6 =\cf7 "ai-provider"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "gemini"\cf6 >\cf5 Google Gemini\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "monica"\cf6 >\cf5 Monica (Coming Soon)\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 </\cf2 select\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "ai-api-key"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >\cf5 AI API 
-\f1 \'aa\'f7\'c6\'5f
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 input\cf5  \cf4 type\cf6 =\cf7 "password"\cf5  \cf4 id\cf6 =\cf7 "ai-api-key"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf5  \cf4 placeholder\cf6 =\cf7 "
-\f1 \'bd\'d0\'bf\'e9\'a4\'4a\'b1\'7a\'aa\'ba
-\f0  AI API 
-\f1 \'aa\'f7\'c6\'5f
-\f0 "\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "save-settings-btn"\cf5  \cf4 class\cf6 =\cf7 "w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700"\cf6 >
-\f1 \cf5 \'c0\'78\'a6\'73\'a8\'c3\'b1\'d2\'a5\'ce\'b3\'5d\'a9\'77
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 </\cf2 section\cf6 >\cf5 \cb1 \
-\cb3                     \cb1 \
-\cb3                     \cf8 <!-- Analysis Input -->\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 section\cf5  \cf4 id\cf6 =\cf7 "analysis-input-section"\cf5  \cf4 class\cf6 =\cf7 "bg-white p-6 rounded-lg shadow-lg locked"\cf6 >\cf5 \cb1 \
-\cb3                          \cf6 <\cf2 h2\cf5  \cf4 class\cf6 =\cf7 "text-xl font-bold mb-4"\cf6 >
-\f1 \cf5 \'a4\'c0\'aa\'52\'a5\'d8\'bc\'d0
-\f0 \cf6 </\cf2 h2\cf6 >\cf5 \cb1 \
-\cb3                          \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "space-y-4"\cf6 >\cf5 \cb1 \
-\cb3                              \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "core-keyword"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >
-\f1 \cf5 \'a6\'e6\'b7\'7e
-\f0 /
-\f1 \'ab\'7e\'b5\'50
-\f0 /
-\f1 \'b2\'a3\'ab\'7e\'c3\'f6\'c1\'e4\'a6\'72
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 input\cf5  \cf4 type\cf6 =\cf7 "text"\cf5  \cf4 id\cf6 =\cf7 "core-keyword"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf5  \cf4 placeholder\cf6 =\cf7 "
-\f1 \'a8\'d2\'a6\'70\'a1\'47\'b9\'71\'b0\'ca\'a8\'ae
-\f0 , SaaS"\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 for\cf6 =\cf7 "target-market"\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >
-\f1 \cf5 \'a5\'d8\'bc\'d0\'a5\'ab\'b3\'f5
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 select\cf5  \cf4 id\cf6 =\cf7 "target-market"\cf5  \cf4 class\cf6 =\cf7 "mt-1 w-full p-2 border rounded-md"\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "us|en"\cf6 >
-\f1 \cf5 \'ac\'fc\'b0\'ea
-\f0  (English)\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "jp|ja"\cf6 >
-\f1 \cf5 \'a4\'e9\'a5\'bb
-\f0  (
-\f1 \'a4\'e9\'a5\'bb\'bb\'79
-\f0 )\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "tw|zh-TW"\cf6 >
-\f1 \cf5 \'a5\'78\'c6\'57
-\f0  (
-\f1 \'c1\'63\'c5\'e9\'a4\'a4\'a4\'e5
-\f0 )\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "de|de"\cf6 >
-\f1 \cf5 \'bc\'77\'b0\'ea
-\f0  (Deutsch)\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 option\cf5  \cf4 value\cf6 =\cf7 "fr|fr"\cf6 >
-\f1 \cf5 \'aa\'6b\'b0\'ea
-\f0  (Fran\'e7ais)\cf6 </\cf2 option\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 </\cf2 select\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                              \cf6 <\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 label\cf5  \cf4 class\cf6 =\cf7 "block text-sm font-medium text-gray-700"\cf6 >
-\f1 \cf5 \'b0\'d3\'b7\'7e\'bc\'d2\'a6\'a1
-\f0 \cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "mt-2 space-x-4"\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 label\cf6 ><\cf2 input\cf5  \cf4 type\cf6 =\cf7 "radio"\cf5  \cf4 name\cf6 =\cf7 "business-model"\cf5  \cf4 value\cf6 =\cf7 "B2C"\cf5  \cf4 checked\cf6 >\cf5  B2C\cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 label\cf6 ><\cf2 input\cf5  \cf4 type\cf6 =\cf7 "radio"\cf5  \cf4 name\cf6 =\cf7 "business-model"\cf5  \cf4 value\cf6 =\cf7 "B2B"\cf6 >\cf5  B2B\cf6 </\cf2 label\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "start-analysis-btn"\cf5  \cf4 class\cf6 =\cf7 "w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition"\cf6 >
-\f1 \cf5 \'b6\'7d\'a9\'6c\'a4\'c0\'aa\'52
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                          \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 </\cf2 section\cf6 >\cf5 \cb1 \
-\cb3                 \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\
-\cb3                 \cf8 <!-- Right Panel: Results & History -->\cf5 \cb1 \
-\cb3                 \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "lg:col-span-2 space-y-6"\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "bg-white rounded-lg shadow-lg"\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "flex border-b"\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 button\cf5  \cf4 data-tab\cf6 =\cf7 "results"\cf5  \cf4 class\cf6 =\cf7 "tab-btn tab active flex-1 p-4 font-semibold"\cf6 >
-\f1 \cf5 \'a4\'c0\'aa\'52\'b5\'b2\'aa\'47
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 button\cf5  \cf4 data-tab\cf6 =\cf7 "history"\cf5  \cf4 class\cf6 =\cf7 "tab-btn tab flex-1 p-4 font-semibold"\cf6 >
-\f1 \cf5 \'be\'fa\'a5\'76\'ac\'f6\'bf\'fd
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\
-\cb3                         \cf8 <!-- Results Panel -->\cf5 \cb1 \
-\cb3                         \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "results-panel"\cf5  \cf4 class\cf6 =\cf7 "panel active p-6"\cf6 >\cf5 \cb1 \
-\cb3                            \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "results-content"\cf5  \cf4 class\cf6 =\cf7 "min-h-[400px]"\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "loading-indicator"\cf5  \cf4 class\cf6 =\cf7 "hidden flex flex-col items-center justify-center h-full"\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 div\cf5  \cf4 class\cf6 =\cf7 "spinner"\cf6 ></\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                     \cf6 <\cf2 p\cf5  \cf4 id\cf6 =\cf7 "loading-status"\cf5  \cf4 class\cf6 =\cf7 "mt-4 text-gray-600 font-medium"\cf6 >
-\f1 \cf5 \'a5\'bf\'a6\'62\'b7\'c7\'b3\'c6\'a4\'c0\'aa\'52
-\f0 ...\cf6 </\cf2 p\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                                \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "results-tabs-container"\cf6 ></\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                            \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                            \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "results-actions"\cf5  \cf4 class\cf6 =\cf7 "hidden mt-4 flex gap-4"\cf6 >\cf5 \cb1 \
-\cb3                                \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "save-analysis-btn"\cf5  \cf4 class\cf6 =\cf7 "flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700"\cf6 >
-\f1 \cf5 \'c0\'78\'a6\'73\'a5\'bb\'a6\'b8\'a4\'c0\'aa\'52
-\f0 \cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                                \cf6 <\cf2 button\cf5  \cf4 id\cf6 =\cf7 "export-excel-btn"\cf5  \cf4 class\cf6 =\cf7 "flex-1 bg-gray-700 text-white font-bold py-2 rounded-lg hover:bg-gray-800"\cf6 >
-\f1 \cf5 \'b6\'d7\'a5\'58\'ac\'b0
-\f0  Excel\cf6 </\cf2 button\cf6 >\cf5 \cb1 \
-\cb3                            \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\
-\cb3                         \cf8 <!-- History Panel -->\cf5 \cb1 \
-\cb3                         \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "history-panel"\cf5  \cf4 class\cf6 =\cf7 "panel p-6 min-h-[400px]"\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 <\cf2 div\cf5  \cf4 id\cf6 =\cf7 "history-list"\cf5  \cf4 class\cf6 =\cf7 "space-y-4"\cf6 >\cf5 \cb1 \
-\cb3                                 \cf6 <\cf2 p\cf5  \cf4 class\cf6 =\cf7 "text-gray-500"\cf6 >
-\f1 \cf5 \'a8\'53\'a6\'b3\'be\'fa\'a5\'76\'ac\'f6\'bf\'fd\'a1\'43
-\f0 \cf6 </\cf2 p\cf6 >\cf5 \cb1 \
-\cb3                             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                     \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3                 \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3             \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\cb3         \cf6 </\cf2 div\cf6 >\cf5 \cb1 \
-\
-\cb3     \cf6 </\cf2 main\cf6 >\cf5 \cb1 \
-\cf6 \cb3 <\cf2 script\cf6 >\cf5 \cb1 \
-\cf8 \cb3 // --- Client-Side Application Logic ---\cf5 \cb1 \
-\
-\cf8 \cb3 // --- 1. State and Configuration ---\cf5 \cb1 \
-\cf12 \cb3 const\cf5  state \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     gapiReady\cf9 :\cf5  \cf12 false\cf9 ,\cf5 \cb1 \
-\cb3     gisReady\cf9 :\cf5  \cf12 false\cf9 ,\cf5 \cb1 \
-\cb3     tokenClient\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3     accessToken\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3     userProfile\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3     driveFolderId\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3     apiKeys\cf9 :\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         google\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3         searchEngineId\cf9 :\cf5  \cf12 null\cf9 ,\cf5 \cb1 \
-\cb3         aiProvider\cf9 :\cf5  \cf10 'gemini'\cf9 ,\cf5 \cb1 \
-\cb3         ai\cf9 :\cf5  \cf12 null\cf5 \cb1 \
-\cb3     \cf9 \},\cf5 \cb1 \
-\cb3     isApiReady\cf9 :\cf5  \cf12 false\cf9 ,\cf5 \cb1 \
-\cb3     currentResults\cf9 :\cf5  \cf12 null\cf5 \cb1 \
-\cf9 \cb3 \};\cf5 \cb1 \
-\
-\cf12 \cb3 const\cf5  \cf13 CONFIG\cf5  \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf8 // IMPORTANT: Replace with your actual Google Cloud Project's Client ID\cf5 \cb1 \
-\cb3     \cf13 CLIENT_ID\cf9 :\cf5  \cf10 "{\field{\*\fldinst{HYPERLINK "http://733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com/"}}{\fldrslt 
-\f2\fs29\fsmilli14667 \cf14 \cb1 \ul \ulc14 \outl0\strokewidth0 \strokec14 733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com}}"\cf9 ,\cf5 \cb1 \
-\cb3     \cf8 // Scopes requested by the application\cf5 \cb1 \
-\cb3     \cf13 SCOPES\cf9 :\cf5  \cf10 "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email"\cf9 ,\cf5 \cb1 \
-\cb3     \cf13 DRIVE_FOLDER_NAME\cf9 :\cf5  \cf10 "MarketingAnalysisTool_Data"\cf5 \cb1 \
-\cf9 \cb3 \};\cf5 \cb1 \
-\
-\cf8 \cb3 // --- 2. Element References ---\cf5 \cb1 \
-\cf12 \cb3 const\cf5  ui \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     authorizeButton\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'authorize_button'\cf9 ),\cf5 \cb1 \
-\cb3     signOutButton\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'signout_button'\cf9 ),\cf5 \cb1 \
-\cb3     authContainer\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'auth-container'\cf9 ),\cf5 \cb1 \
-\cb3     userProfile\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'user-profile'\cf9 ),\cf5 \cb1 \
-\cb3     appContainer\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'app-container'\cf9 ),\cf5 \cb1 \
-\cb3     settingsSection\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'settings-section'\cf9 ),\cf5 \cb1 \
-\cb3     analysisSection\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'analysis-input-section'\cf9 ),\cf5 \cb1 \
-\cb3     saveSettingsBtn\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'save-settings-btn'\cf9 ),\cf5 \cb1 \
-\cb3     startAnalysisBtn\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'start-analysis-btn'\cf9 ),\cf5 \cb1 \
-\cb3     loadingIndicator\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'loading-indicator'\cf9 ),\cf5 \cb1 \
-\cb3     loadingStatus\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'loading-status'\cf9 ),\cf5 \cb1 \
-\cb3     resultsContainer\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'results-tabs-container'\cf9 ),\cf5 \cb1 \
-\cb3     resultsActions\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'results-actions'\cf9 ),\cf5 \cb1 \
-\cb3     historyList\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'history-list'\cf9 ),\cf5 \cb1 \
-\cf9 \cb3 \};\cf5 \cb1 \
-\
-\cf8 \cb3 // --- 3. Initialization ---\cf5 \cb1 \
-\cb3 window\cf9 .\cf5 onload \cf9 =\cf5  \cf9 ()\cf5  \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf8 // Load Google's API client and Identity Services scripts\cf5 \cb1 \
-\cb3     gapi\cf9 .\cf5 load\cf9 (\cf10 'client'\cf9 ,\cf5  gapiLoaded\cf9 );\cf5 \cb1 \
-\cb3     \cf12 const\cf5  gisScript \cf9 =\cf5  document\cf9 .\cf5 createElement\cf9 (\cf10 'script'\cf9 );\cf5 \cb1 \
-\cb3     gisScript\cf9 .\cf5 src \cf9 =\cf5  \cf10 'https://accounts.google.com/gsi/client'\cf9 ;\cf5 \cb1 \
-\cb3     gisScript\cf9 .\cf12 async\cf5  \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3     gisScript\cf9 .\cf5 defer \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3     gisScript\cf9 .\cf5 onload \cf9 =\cf5  gisLoaded\cf9 ;\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 body\cf9 .\cf5 appendChild\cf9 (\cf5 gisScript\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf8 // Setup event listeners\cf5 \cb1 \
-\cb3     setupEventListeners\cf9 ();\cf5 \cb1 \
-\cf9 \cb3 \};\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  setupEventListeners\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 authorizeButton\cf9 .\cf5 onclick \cf9 =\cf5  handleAuthClick\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 signOutButton\cf9 .\cf5 onclick \cf9 =\cf5  handleSignOutClick\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 saveSettingsBtn\cf9 .\cf5 onclick \cf9 =\cf5  handleSaveSettings\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 startAnalysisBtn\cf9 .\cf5 onclick \cf9 =\cf5  startAnalysisWorkflow\cf9 ;\cf5 \cb1 \
-\
-\cb3     document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.tab-btn'\cf9 ).\cf5 forEach\cf9 (\cf5 btn \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         btn\cf9 .\cf5 addEventListener\cf9 (\cf10 'click'\cf9 ,\cf5  \cf9 ()\cf5  \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf12 const\cf5  tab \cf9 =\cf5  btn\cf9 .\cf5 dataset\cf9 .\cf5 tab\cf9 ;\cf5 \cb1 \
-\cb3             \cf8 // Manage button styles\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.tab-btn'\cf9 ).\cf5 forEach\cf9 (\cf5 b \cf9 =>\cf5  b\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'active'\cf9 ));\cf5 \cb1 \
-\cb3             btn\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'active'\cf9 );\cf5 \cb1 \
-\cb3             \cf8 // Manage panel visibility\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.panel'\cf9 ).\cf5 forEach\cf9 (\cf5 p \cf9 =>\cf5  p\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'active'\cf9 ));\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 `\cf9 $\{\cf5 tab\cf9 \}\cf10 -panel`\cf9 ).\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'active'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf8 // Delegated event listeners for dynamically created content\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 getElementById\cf9 (\cf10 'history-list'\cf9 ).\cf5 addEventListener\cf9 (\cf10 'click'\cf9 ,\cf5  handleHistoryAction\cf9 );\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 getElementById\cf9 (\cf10 'results-actions'\cf9 ).\cf5 addEventListener\cf9 (\cf10 'click'\cf9 ,\cf5  handleResultAction\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\
-\cf8 \cb3 // --- 4. Authentication & Authorization ---\cf5 \cb1 \
-\cf12 \cb3 function\cf5  gapiLoaded\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     gapi\cf9 .\cf5 client\cf9 .\cf5 init\cf9 (\{\}).\cf5 then\cf9 (()\cf5  \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 gapiReady \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3         maybeEnableAuthButton\cf9 ();\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  gisLoaded\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     state\cf9 .\cf5 tokenClient \cf9 =\cf5  google\cf9 .\cf5 accounts\cf9 .\cf5 oauth2\cf9 .\cf5 initTokenClient\cf9 (\{\cf5 \cb1 \
-\cb3         client_id\cf9 :\cf5  \cf13 CONFIG\cf9 .\cf13 CLIENT_ID\cf9 ,\cf5 \cb1 \
-\cb3         scope\cf9 :\cf5  \cf13 CONFIG\cf9 .\cf13 SCOPES\cf9 ,\cf5 \cb1 \
-\cb3         callback\cf9 :\cf5  gisInCallback\cf9 ,\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cb3     state\cf9 .\cf5 gisReady \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3     maybeEnableAuthButton\cf9 ();\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  maybeEnableAuthButton\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 state\cf9 .\cf5 gapiReady \cf9 &&\cf5  state\cf9 .\cf5 gisReady\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         ui\cf9 .\cf5 authorizeButton\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  gisInCallback\cf9 (\cf5 resp\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 resp\cf9 .\cf5 error\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Authentication Error'\cf9 ,\cf5  resp\cf9 .\cf5 error\cf9 ,\cf5  \cf10 'error'\cf9 );\cf5 \cb1 \
-\cb3         \cf12 return\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cb3     state\cf9 .\cf5 accessToken \cf9 =\cf5  resp\cf9 ;\cf5 \cb1 \
-\cb3     gapi\cf9 .\cf5 client\cf9 .\cf5 setToken\cf9 (\cf5 state\cf9 .\cf5 accessToken\cf9 );\cf5 \cb1 \
-\cb3     handleSuccessfulLogin\cf9 ();\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  handleAuthClick\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 gapi\cf9 .\cf5 client\cf9 .\cf5 getToken\cf9 ()\cf5  \cf9 ===\cf5  \cf12 null\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 tokenClient\cf9 .\cf5 requestAccessToken\cf9 (\{\cf5  prompt\cf9 :\cf5  \cf10 'consent'\cf5  \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 else\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 tokenClient\cf9 .\cf5 requestAccessToken\cf9 (\{\cf5  prompt\cf9 :\cf5  \cf10 ''\cf5  \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  handleSuccessfulLogin\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 authorizeButton\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 userProfile\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 userProfile\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'flex'\cf9 );\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 appContainer\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'locked'\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf8 // Fetch and display user profile\cf5 \cb1 \
-\cb3     \cf12 const\cf5  profile \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 oauth2\cf9 .\cf5 userinfo\cf9 .\cf12 get\cf9 ();\cf5 \cb1 \
-\cb3     state\cf9 .\cf5 userProfile \cf9 =\cf5  profile\cf9 .\cf5 result\cf9 ;\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 getElementById\cf9 (\cf10 'user-avatar'\cf9 ).\cf5 src \cf9 =\cf5  state\cf9 .\cf5 userProfile\cf9 .\cf5 picture\cf9 ;\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 getElementById\cf9 (\cf10 'user-name'\cf9 ).\cf5 textContent \cf9 =\cf5  state\cf9 .\cf5 userProfile\cf9 .\cf5 given_name \cf9 ||\cf5  state\cf9 .\cf5 userProfile\cf9 .\cf5 name\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf8 // Load saved settings and check for Drive folder\cf5 \cb1 \
-\cb3     loadSettingsFromLocalStorage\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 await\cf5  setupGoogleDrive\cf9 ();\cf5 \cb1 \
-\cb3     loadAnalysisHistory\cf9 ();\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  handleSignOutClick\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  token \cf9 =\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 getToken\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 token \cf9 !==\cf5  \cf12 null\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         google\cf9 .\cf5 accounts\cf9 .\cf5 oauth2\cf9 .\cf5 revoke\cf9 (\cf5 token\cf9 .\cf5 access_token\cf9 ,\cf5  \cf9 ()\cf5  \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             gapi\cf9 .\cf5 client\cf9 .\cf5 setToken\cf9 (\cf10 ''\cf9 );\cf5 \cb1 \
-\cb3             state\cf9 .\cf5 accessToken \cf9 =\cf5  \cf12 null\cf9 ;\cf5 \cb1 \
-\cb3             state\cf9 .\cf5 userProfile \cf9 =\cf5  \cf12 null\cf9 ;\cf5 \cb1 \
-\cb3             \cb1 \
-\cb3             ui\cf9 .\cf5 userProfile\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3             ui\cf9 .\cf5 authorizeButton\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3             ui\cf9 .\cf5 appContainer\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'locked'\cf9 );\cf5 \cb1 \
-\cb3             ui\cf9 .\cf5 analysisSection\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'locked'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\
-\cf8 \cb3 // --- 5. API Settings ---\cf5 \cb1 \
-\cf12 \cb3 function\cf5  handleSaveSettings\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  googleApiKey \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'google-api-key'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 const\cf5  searchEngineId \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'search-engine-id'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 const\cf5  aiProvider \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'ai-provider'\cf9 ).\cf5 value\cf9 ;\cf5 \cb1 \
-\cb3     \cf12 const\cf5  aiApiKey \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'ai-api-key'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ();\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 googleApiKey \cf9 ||\cf5  \cf9 !\cf5 searchEngineId \cf9 ||\cf5  \cf9 !\cf5 aiApiKey\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Information Missing'\cf9 ,\cf5  \cf10 'Please fill in all API key and ID fields.'\cf9 ,\cf5  \cf10 'warning'\cf9 );\cf5 \cb1 \
-\cb3         \cf12 return\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\
-\cb3     state\cf9 .\cf5 apiKeys \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         google\cf9 :\cf5  googleApiKey\cf9 ,\cf5 \cb1 \
-\cb3         searchEngineId\cf9 :\cf5  searchEngineId\cf9 ,\cf5 \cb1 \
-\cb3         aiProvider\cf9 :\cf5  aiProvider\cf9 ,\cf5 \cb1 \
-\cb3         ai\cf9 :\cf5  aiApiKey\cb1 \
-\cb3     \cf9 \};\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf8 // "Encrypt" by base64 encoding for simple obfuscation in local storage\cf5 \cb1 \
-\cb3     localStorage\cf9 .\cf5 setItem\cf9 (\cf10 'marketingToolApiKeys'\cf9 ,\cf5  btoa\cf9 (\cf13 JSON\cf9 .\cf5 stringify\cf9 (\cf5 state\cf9 .\cf5 apiKeys\cf9 )));\cf5 \cb1 \
-\cb3     state\cf9 .\cf5 isApiReady \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 analysisSection\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'locked'\cf9 );\cf5 \cb1 \
-\cb3     showAlert\cf9 (\cf10 'Settings Saved'\cf9 ,\cf5  \cf10 'API settings have been saved and activated.'\cf9 ,\cf5  \cf10 'success'\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  loadSettingsFromLocalStorage\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  savedKeys \cf9 =\cf5  localStorage\cf9 .\cf5 getItem\cf9 (\cf10 'marketingToolApiKeys'\cf9 );\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 savedKeys\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf12 try\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf12 const\cf5  decodedKeys \cf9 =\cf5  \cf13 JSON\cf9 .\cf5 parse\cf9 (\cf5 atob\cf9 (\cf5 savedKeys\cf9 ));\cf5 \cb1 \
-\cb3             state\cf9 .\cf5 apiKeys \cf9 =\cf5  decodedKeys\cf9 ;\cf5 \cb1 \
-\cb3             state\cf9 .\cf5 isApiReady \cf9 =\cf5  \cf12 true\cf9 ;\cf5 \cb1 \
-\cb3             \cb1 \
-\cb3             \cf8 // Populate fields\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 'google-api-key'\cf9 ).\cf5 value \cf9 =\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 google \cf9 ||\cf5  \cf10 ''\cf9 ;\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 'search-engine-id'\cf9 ).\cf5 value \cf9 =\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 searchEngineId \cf9 ||\cf5  \cf10 ''\cf9 ;\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 'ai-provider'\cf9 ).\cf5 value \cf9 =\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 aiProvider \cf9 ||\cf5  \cf10 'gemini'\cf9 ;\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 'ai-api-key'\cf9 ).\cf5 value \cf9 =\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 ai \cf9 ||\cf5  \cf10 ''\cf9 ;\cf5 \cb1 \
-\
-\cb3             ui\cf9 .\cf5 analysisSection\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'locked'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \}\cf5  \cf12 catch\cf5  \cf9 (\cf5 e\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             console\cf9 .\cf5 error\cf9 (\cf10 "Failed to parse saved API keys:"\cf9 ,\cf5  e\cf9 );\cf5 \cb1 \
-\cb3             localStorage\cf9 .\cf5 removeItem\cf9 (\cf10 'marketingToolApiKeys'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \}\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\
-\cf8 \cb3 // --- 6. Google Drive Integration ---\cf5 \cb1 \
-\cf12 \cb3 async\cf5  \cf12 function\cf5  setupGoogleDrive\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 load\cf9 (\cf10 'drive'\cf9 ,\cf5  \cf10 'v3'\cf9 );\cf5 \cb1 \
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 drive\cf9 .\cf5 files\cf9 .\cf5 list\cf9 (\{\cf5 \cb1 \
-\cb3         q\cf9 :\cf5  \cf10 `name='\cf9 $\{\cf13 CONFIG\cf9 .\cf13 DRIVE_FOLDER_NAME\cf9 \}\cf10 ' and mimeType='application/vnd.google-apps.folder' and trashed=false`\cf9 ,\cf5 \cb1 \
-\cb3         fields\cf9 :\cf5  \cf10 'files(id, name)'\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 response\cf9 .\cf5 result\cf9 .\cf5 files\cf9 .\cf5 length \cf9 >\cf5  \cf15 0\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 driveFolderId \cf9 =\cf5  response\cf9 .\cf5 result\cf9 .\cf5 files\cf9 [\cf15 0\cf9 ].\cf5 id\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 else\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf12 const\cf5  fileMetadata \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf10 'name'\cf9 :\cf5  \cf13 CONFIG\cf9 .\cf13 DRIVE_FOLDER_NAME\cf9 ,\cf5 \cb1 \
-\cb3             \cf10 'mimeType'\cf9 :\cf5  \cf10 'application/vnd.google-apps.folder'\cf5 \cb1 \
-\cb3         \cf9 \};\cf5 \cb1 \
-\cb3         \cf12 const\cf5  createResponse \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 drive\cf9 .\cf5 files\cf9 .\cf5 create\cf9 (\{\cf5 \cb1 \
-\cb3             resource\cf9 :\cf5  fileMetadata\cf9 ,\cf5 \cb1 \
-\cb3             fields\cf9 :\cf5  \cf10 'id'\cf5 \cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 driveFolderId \cf9 =\cf5  createResponse\cf9 .\cf5 result\cf9 .\cf5 id\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\
-\cf8 \cb3 // --- 7. Main Analysis Workflow ---\cf5 \cb1 \
-\cf12 \cb3 async\cf5  \cf12 function\cf5  startAnalysisWorkflow\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 state\cf9 .\cf5 isApiReady\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'API Not Ready'\cf9 ,\cf5  \cf10 'Please save your API settings first.'\cf9 ,\cf5  \cf10 'error'\cf9 );\cf5 \cb1 \
-\cb3         \cf12 return\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  coreKeyword \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 coreKeyword\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Input Required'\cf9 ,\cf5  \cf10 'Please enter an industry, brand, or product keyword.'\cf9 ,\cf5  \cf10 'warning'\cf9 );\cf5 \cb1 \
-\cb3         \cf12 return\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\
-\cb3     ui\cf9 .\cf5 loadingIndicator\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 resultsContainer\cf9 .\cf5 innerHTML \cf9 =\cf5  \cf10 ''\cf9 ;\cf5  \cf8 // Clear previous results\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 resultsActions\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf12 try\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf8 // Step 1: Generate Keywords\cf5 \cb1 \
-\cb3         ui\cf9 .\cf5 loadingStatus\cf9 .\cf5 textContent \cf9 =\cf5  \cf10 '
-\f1 \'a8\'42\'c6\'4a
-\f0  1/3: 
-\f1 \'a5\'bf\'a6\'62\'a5\'cd\'a6\'a8\'a6\'e6\'b7\'7e\'c3\'f6\'c1\'e4\'a6\'72
-\f0 ...'\cf9 ;\cf5 \cb1 \
-\cb3         \cf12 const\cf5  keywordData \cf9 =\cf5  \cf12 await\cf5  getAiKeywordAnalysis\cf9 ();\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 currentResults \cf9 =\cf5  \cf9 \{\cf5  keywords\cf9 :\cf5  keywordData\cf9 .\cf5 keywords \cf9 ||\cf5  \cf9 []\cf5  \cf9 \};\cf5 \cb1 \
-\cb3         \cb1 \
-\cb3         \cf8 // Step 2: Competitor Analysis\cf5 \cb1 \
-\cb3         ui\cf9 .\cf5 loadingStatus\cf9 .\cf5 textContent \cf9 =\cf5  \cf10 '
-\f1 \'a8\'42\'c6\'4a
-\f0  2/3: 
-\f1 \'a5\'bf\'a6\'62\'b7\'6a\'b4\'4d\'c4\'76\'aa\'a7\'b9\'ef\'a4\'e2
-\f0 ...'\cf9 ;\cf5 \cb1 \
-\cb3         \cf12 const\cf5  searchResults \cf9 =\cf5  \cf12 await\cf5  performGoogleSearch\cf9 (\cf5 state\cf9 .\cf5 currentResults\cf9 .\cf5 keywords\cf9 );\cf5 \cb1 \
-\cb3         \cb1 \
-\cb3         ui\cf9 .\cf5 loadingStatus\cf9 .\cf5 textContent \cf9 =\cf5  \cf10 '
-\f1 \'a8\'42\'c6\'4a
-\f0  3/3: 
-\f1 \'a5\'bf\'a6\'62\'a4\'c0\'aa\'52\'c4\'76\'aa\'a7\'b9\'ef\'a4\'e2\'b8\'ea\'b0\'54
-\f0 ...'\cf9 ;\cf5 \cb1 \
-\cb3         \cf12 const\cf5  competitorData \cf9 =\cf5  \cf12 await\cf5  getAiCompetitorAnalysis\cf9 (\cf5 searchResults\cf9 );\cf5 \cb1 \
-\cb3         state\cf9 .\cf5 currentResults\cf9 .\cf5 competitors \cf9 =\cf5  competitorData\cf9 .\cf5 competitors \cf9 ||\cf5  \cf9 [];\cf5 \cb1 \
-\
-\cb3         \cf8 // Step 3: Render results\cf5 \cb1 \
-\cb3         renderAnalysisResults\cf9 (\cf5 state\cf9 .\cf5 currentResults\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf9 \}\cf5  \cf12 catch\cf5  \cf9 (\cf5 error\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         console\cf9 .\cf5 error\cf9 (\cf10 "Analysis failed:"\cf9 ,\cf5  error\cf9 );\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Analysis Failed'\cf9 ,\cf5  \cf10 `An error occurred: \cf9 $\{\cf5 error\cf9 .\cf5 message\cf9 \}\cf10 `\cf9 ,\cf5  \cf10 'error'\cf9 );\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 finally\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         ui\cf9 .\cf5 loadingIndicator\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf8 \cb3 // --- 8. API Call Functions ---\cf5 \cb1 \
-\cf12 \cb3 async\cf5  \cf12 function\cf5  getAiKeywordAnalysis\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  marketInfo \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'target-market'\cf9 ).\cf5 value\cf9 .\cf5 split\cf9 (\cf10 '|'\cf9 );\cf5 \cb1 \
-\cb3     \cf12 const\cf5  prompt \cf9 =\cf5  \cf10 `\cf5 \cb1 \
-\cf10 \cb3         You are a senior SEO and market analysis expert specializing in the \cf9 $\{\cf5 marketInfo\cf9 [\cf15 0\cf9 ]\}\cf10  market.\cf5 \cb1 \
-\cf10 \cb3         Please generate a detailed keyword analysis report based on the following criteria:\cf5 \cb1 \
-\cf10 \cb3         - Core Topic: "\cf9 $\{\cf5 document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 \}\cf10 "\cf5 \cb1 \
-\cf10 \cb3         - Business Model: "\cf9 $\{\cf5 document\cf9 .\cf5 querySelector\cf9 (\cf10 'input[name="business-model"]:checked'\cf9 ).\cf5 value\cf9 \}\cf10 "\cf5 \cb1 \
-\cf10 \cb3         - Target Language: "\cf9 $\{\cf5 marketInfo\cf9 [\cf15 1\cf9 ]\}\cf10 "\cf5 \cb1 \
-\cf10 \cb3         \cf5 \cb1 \
-\cf10 \cb3         Provide 20 relevant keywords, including short-tail, mid-tail, and long-tail variations. For each keyword, assess its "Search Volume Level" (High, Medium, Low) and "Keyword Type" (e.g., Brand, Product, Comparison, Question, Informational).\cf5 \cb1 \
-\cf10 \cb3         \cf5 \cb1 \
-\cf10 \cb3         Return the response strictly in the following JSON format:\cf5 \cb1 \
-\cf10 \cb3         \{ "keywords": [\{ "keyword": "...", "volume": "High", "type": "Product" \}, ...] \}`\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  callGeminiAPI\cf9 (\cf5 prompt\cf9 );\cf5 \cb1 \
-\cb3     \cf12 return\cf5  \cf13 JSON\cf9 .\cf5 parse\cf9 (\cf5 response\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  performGoogleSearch\cf9 (\cf5 keywords\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 keywords \cf9 ||\cf5  keywords\cf9 .\cf5 length \cf9 ===\cf5  \cf15 0\cf9 )\cf5  \cf12 return\cf5  \cf9 [];\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf8 // Select top 3 high-volume keywords for the query\cf5 \cb1 \
-\cb3     \cf12 const\cf5  query \cf9 =\cf5  keywords\cf9 .\cf5 filter\cf9 (\cf5 k \cf9 =>\cf5  k\cf9 .\cf5 volume \cf9 ===\cf5  \cf10 'High'\cf9 ).\cf5 slice\cf9 (\cf15 0\cf9 ,\cf5  \cf15 3\cf9 ).\cf5 map\cf9 (\cf5 k \cf9 =>\cf5  k\cf9 .\cf5 keyword\cf9 ).\cf5 join\cf9 (\cf10 ' OR '\cf9 );\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 query\cf9 )\cf5  \cf12 return\cf5  \cf9 [];\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  marketInfo \cf9 =\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'target-market'\cf9 ).\cf5 value\cf9 .\cf5 split\cf9 (\cf10 '|'\cf9 );\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 request\cf9 (\{\cf5 \cb1 \
-\cb3         \cf10 'path'\cf9 :\cf5  \cf10 `https://customsearch.googleapis.com/customsearch/v1`\cf9 ,\cf5 \cb1 \
-\cb3         \cf10 'params'\cf9 :\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf10 'key'\cf9 :\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 google\cf9 ,\cf5 \cb1 \
-\cb3             \cf10 'cx'\cf9 :\cf5  state\cf9 .\cf5 apiKeys\cf9 .\cf5 searchEngineId\cf9 ,\cf5 \cb1 \
-\cb3             \cf10 'q'\cf9 :\cf5  query\cf9 ,\cf5 \cb1 \
-\cb3             \cf10 'cr'\cf9 :\cf5  \cf10 `country\cf9 $\{\cf5 marketInfo\cf9 [\cf15 0\cf9 ].\cf5 toUpperCase\cf9 ()\}\cf10 `\cf5 \cb1 \
-\cb3         \cf9 \}\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\
-\cb3     \cf12 return\cf5  response\cf9 .\cf5 result\cf9 .\cf5 items \cf9 ||\cf5  \cf9 [];\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  getAiCompetitorAnalysis\cf9 (\cf5 searchResults\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 searchResults\cf9 .\cf5 length \cf9 ===\cf5  \cf15 0\cf9 )\cf5  \cf12 return\cf5  \cf9 \{\cf5  competitors\cf9 :\cf5  \cf9 []\cf5  \cf9 \};\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  context \cf9 =\cf5  searchResults\cf9 .\cf5 slice\cf9 (\cf15 0\cf9 ,\cf5  \cf15 10\cf9 ).\cf5 map\cf9 (\cf5 item \cf9 =>\cf5  \cf10 `Title: \cf9 $\{\cf5 item\cf9 .\cf5 title\cf9 \}\cf10 \\nURL: \cf9 $\{\cf5 item\cf9 .\cf5 link\cf9 \}\cf10 \\nSnippet: \cf9 $\{\cf5 item\cf9 .\cf5 snippet\cf9 \}\cf10 `\cf9 ).\cf5 join\cf9 (\cf10 '\\n\\n'\cf9 );\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 const\cf5  prompt \cf9 =\cf5  \cf10 `\cf5 \cb1 \
-\cf10 \cb3         You are a market intelligence analyst. Below are Google search results for "\cf9 $\{\cf5 document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 \}\cf10 ". Please analyze them and identify the 5 most significant competitors.\cf5 \cb1 \
-\cf10 \cb3         \cf5 \cb1 \
-\cf10 \cb3         For each competitor, complete the following tasks:\cf5 \cb1 \
-\cf10 \cb3         1. Identify their official brand name and main website URL.\cf5 \cb1 \
-\cf10 \cb3         2. Summarize their core business in Traditional Chinese (max 30 words) based on their website snippet.\cf5 \cb1 \
-\cf10 \cb3         3. Find their official LinkedIn company page URL. Return "N/A" if not found.\cf5 \cb1 \
-\cf10 \cb3         4. Classify their business into one of the following types: [SaaS, Hardware Manufacturer, Consulting Service, Retail E-commerce, Agency, Content Platform].\cf5 \cb1 \
-\cf10 \cb3         \cf5 \cb1 \
-\cf10 \cb3         Return the response strictly in the following JSON format:\cf5 \cb1 \
-\cf10 \cb3         \{ "competitors": [\{ "brandName": "...", "websiteUrl": "...", "summary": "...", "linkedinUrl": "...", "companyType": "SaaS" \}, ...] \}\cf5 \cb1 \
-\cf10 \cb3         \cf5 \cb1 \
-\cf10 \cb3         Context from search results:\cf5 \cb1 \
-\cf10 \cb3         \cf9 $\{\cf5 context\cf9 \}\cf10 `\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  callGeminiAPI\cf9 (\cf5 prompt\cf9 );\cf5 \cb1 \
-\cb3     \cf12 return\cf5  \cf13 JSON\cf9 .\cf5 parse\cf9 (\cf5 response\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  callGeminiAPI\cf9 (\cf5 prompt\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  url \cf9 =\cf5  \cf10 `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=\cf9 $\{\cf5 state\cf9 .\cf5 apiKeys\cf9 .\cf5 ai\cf9 \}\cf10 `\cf9 ;\cf5 \cb1 \
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  fetch\cf9 (\cf5 url\cf9 ,\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         method\cf9 :\cf5  \cf10 'POST'\cf9 ,\cf5 \cb1 \
-\cb3         headers\cf9 :\cf5  \cf9 \{\cf5  \cf10 'Content-Type'\cf9 :\cf5  \cf10 'application/json'\cf5  \cf9 \},\cf5 \cb1 \
-\cb3         body\cf9 :\cf5  \cf13 JSON\cf9 .\cf5 stringify\cf9 (\{\cf5 \cb1 \
-\cb3             contents\cf9 :\cf5  \cf9 [\{\cf5  parts\cf9 :\cf5  \cf9 [\{\cf5  text\cf9 :\cf5  prompt \cf9 \}]\cf5  \cf9 \}]\cf5 \cb1 \
-\cb3         \cf9 \})\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 response\cf9 .\cf5 ok\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf12 const\cf5  errorBody \cf9 =\cf5  \cf12 await\cf5  response\cf9 .\cf5 json\cf9 ();\cf5 \cb1 \
-\cb3         \cf12 throw\cf5  \cf12 new\cf5  \cf13 Error\cf9 (\cf10 `Gemini API Error: \cf9 $\{\cf5 errorBody\cf9 .\cf5 error\cf9 .\cf5 message\cf9 \}\cf10 `\cf9 );\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cb3     \cf12 const\cf5  data \cf9 =\cf5  \cf12 await\cf5  response\cf9 .\cf5 json\cf9 ();\cf5 \cb1 \
-\cb3     \cf8 // Clean the response text to get valid JSON\cf5 \cb1 \
-\cb3     \cf12 let\cf5  text \cf9 =\cf5  data\cf9 .\cf5 candidates\cf9 [\cf15 0\cf9 ].\cf5 content\cf9 .\cf5 parts\cf9 [\cf15 0\cf9 ].\cf5 text\cf9 ;\cf5 \cb1 \
-\cb3     text \cf9 =\cf5  text\cf9 .\cf5 replace\cf9 (\cf16 /```json/\cf12 g\cf9 ,\cf5  \cf10 ''\cf9 ).\cf5 replace\cf9 (\cf16 /```/\cf12 g\cf9 ,\cf5  \cf10 ''\cf9 ).\cf5 trim\cf9 ();\cf5 \cb1 \
-\cb3     \cf12 return\cf5  text\cf9 ;\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\
-\cf8 \cb3 // --- 9. Rendering, History & Export ---\cf5 \cb1 \
-\cf12 \cb3 function\cf5  renderAnalysisResults\cf9 (\cf5 results\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 let\cf5  html \cf9 =\cf5  \cf10 `\cf5 \cb1 \
-\cf10 \cb3         <div class="flex border-b">\cf5 \cb1 \
-\cf10 \cb3             <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">
-\f1 \'c3\'f6\'c1\'e4\'a6\'72\'a4\'c0\'aa\'52
-\f0 </button>\cf5 \cb1 \
-\cf10 \cb3             <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">
-\f1 \'c4\'76\'aa\'a7\'b9\'ef\'a4\'e2
-\f0 </button>\cf5 \cb1 \
-\cf10 \cb3         </div>\cf5 \cb1 \
-\cf10 \cb3         <div id="keywords-result-panel" class="result-panel active p-4">\cf5 \cb1 \
-\cf10 \cb3             <table class="w-full text-left">\cf5 \cb1 \
-\cf10 \cb3                 <thead><tr class="border-b"><th class="py-2">
-\f1 \'c3\'f6\'c1\'e4\'a6\'72
-\f0 </th><th>
-\f1 \'b7\'6a\'b4\'4d\'b6\'71\'af\'c5
-\f0 </th><th>
-\f1 \'c3\'fe\'ab\'ac
-\f0 </th></tr></thead>\cf5 \cb1 \
-\cf10 \cb3                 <tbody>\cf9 $\{\cf5 results\cf9 .\cf5 keywords\cf9 .\cf5 map\cf9 (\cf5 k \cf9 =>\cf5  \cf10 `<tr><td class="py-2">\cf9 $\{\cf5 k\cf9 .\cf5 keyword\cf9 \}\cf10 </td><td>\cf9 $\{\cf5 k\cf9 .\cf5 volume\cf9 \}\cf10 </td><td>\cf9 $\{\cf5 k\cf9 .\cf5 type\cf9 \}\cf10 </td></tr>`\cf9 ).\cf5 join\cf9 (\cf10 ''\cf9 )\}\cf10 </tbody>\cf5 \cb1 \
-\cf10 \cb3             </table>\cf5 \cb1 \
-\cf10 \cb3         </div>\cf5 \cb1 \
-\cf10 \cb3         <div id="competitors-result-panel" class="result-panel p-4 space-y-4">\cf5 \cb1 \
-\cf10 \cb3              \cf9 $\{\cf5 results\cf9 .\cf5 competitors\cf9 .\cf5 map\cf9 (\cf5 c \cf9 =>\cf5  \cf10 `\cf5 \cb1 \
-\cf10 \cb3                 <div class="p-3 border rounded-lg">\cf5 \cb1 \
-\cf10 \cb3                     <p class="font-bold text-lg">\cf9 $\{\cf5 c\cf9 .\cf5 brandName\cf9 \}\cf10 </p>\cf5 \cb1 \
-\cf10 \cb3                     <p class="text-sm text-gray-600">\cf9 $\{\cf5 c\cf9 .\cf5 summary\cf9 \}\cf10 </p>\cf5 \cb1 \
-\cf10 \cb3                     <p class="mt-2 text-sm"><strong>
-\f1 \'c3\'fe\'ab\'ac
-\f0 :</strong> \cf9 $\{\cf5 c\cf9 .\cf5 companyType\cf9 \}\cf10 </p>\cf5 \cb1 \
-\cf10 \cb3                     <div class="mt-2 text-sm flex gap-4">\cf5 \cb1 \
-\cf10 \cb3                         <a href="\cf9 $\{\cf5 c\cf9 .\cf5 websiteUrl\cf9 \}\cf10 " target="_blank" class="text-blue-600 hover:underline">
-\f1 \'ba\'f4\'af\'b8
-\f0 </a>\cf5 \cb1 \
-\cf10 \cb3                         \cf9 $\{\cf5 c\cf9 .\cf5 linkedinUrl \cf9 !==\cf5  \cf10 'N/A'\cf5  \cf9 ?\cf5  \cf10 `<a href="\cf9 $\{\cf5 c\cf9 .\cf5 linkedinUrl\cf9 \}\cf10 " target="_blank" class="text-blue-600 hover:underline">LinkedIn</a>`\cf5  \cf9 :\cf5  \cf10 ''\cf9 \}\cf5 \cb1 \
-\cf10 \cb3                     </div>\cf5 \cb1 \
-\cf10 \cb3                 </div>\cf5 \cb1 \
-\cf10 \cb3              `\cf9 ).\cf5 join\cf9 (\cf10 ''\cf9 )\}\cf5 \cb1 \
-\cf10 \cb3         </div>\cf5 \cb1 \
-\cf10 \cb3     `\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 resultsContainer\cf9 .\cf5 innerHTML \cf9 =\cf5  html\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 resultsActions\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'hidden'\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf8 // Add event listeners for the new result tabs\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.result-tab-btn'\cf9 ).\cf5 forEach\cf9 (\cf5 btn \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         btn\cf9 .\cf5 addEventListener\cf9 (\cf10 'click'\cf9 ,\cf5  \cf9 ()\cf5  \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf12 const\cf5  tab \cf9 =\cf5  btn\cf9 .\cf5 dataset\cf9 .\cf5 resultTab\cf9 ;\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.result-tab-btn'\cf9 ).\cf5 forEach\cf9 (\cf5 b \cf9 =>\cf5  b\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'active'\cf9 ));\cf5 \cb1 \
-\cb3             btn\cf9 .\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'active'\cf9 );\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 querySelectorAll\cf9 (\cf10 '.result-panel'\cf9 ).\cf5 forEach\cf9 (\cf5 p \cf9 =>\cf5  p\cf9 .\cf5 classList\cf9 .\cf5 remove\cf9 (\cf10 'active'\cf9 ));\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 getElementById\cf9 (\cf10 `\cf9 $\{\cf5 tab\cf9 \}\cf10 -result-panel`\cf9 ).\cf5 classList\cf9 .\cf5 add\cf9 (\cf10 'active'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  saveAnalysisToDrive\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 state\cf9 .\cf5 currentResults \cf9 ||\cf5  \cf9 !\cf5 state\cf9 .\cf5 driveFolderId\cf9 )\cf5  \cf12 return\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  metadata \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         name\cf9 :\cf5  \cf10 `\cf9 $\{\cf5 document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ()\}\cf10 _\cf9 $\{\cf12 new\cf5  \cf13 Date\cf9 ().\cf5 toISOString\cf9 ()\}\cf10 .json`\cf9 ,\cf5 \cb1 \
-\cb3         mimeType\cf9 :\cf5  \cf10 'application/json'\cf9 ,\cf5 \cb1 \
-\cb3         parents\cf9 :\cf5  \cf9 [\cf5 state\cf9 .\cf5 driveFolderId\cf9 ]\cf5 \cb1 \
-\cb3     \cf9 \};\cf5 \cb1 \
-\cb3     \cf12 const\cf5  boundary \cf9 =\cf5  \cf10 '-------314159265358979323846'\cf9 ;\cf5 \cb1 \
-\cb3     \cf12 const\cf5  delimiter \cf9 =\cf5  \cf10 `\\r\\n--\cf9 $\{\cf5 boundary\cf9 \}\cf10 \\r\\n`\cf9 ;\cf5 \cb1 \
-\cb3     \cf12 const\cf5  close_delim \cf9 =\cf5  \cf10 `\\r\\n--\cf9 $\{\cf5 boundary\cf9 \}\cf10 --`\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  multipartRequestBody \cf9 =\cf5 \cb1 \
-\cb3         delimiter \cf9 +\cf5 \cb1 \
-\cb3         \cf10 'Content-Type: application/json; charset=UTF-8\\r\\n\\r\\n'\cf5  \cf9 +\cf5 \cb1 \
-\cb3         \cf13 JSON\cf9 .\cf5 stringify\cf9 (\cf5 metadata\cf9 )\cf5  \cf9 +\cf5 \cb1 \
-\cb3         delimiter \cf9 +\cf5 \cb1 \
-\cb3         \cf10 'Content-Type: application/json\\r\\n\\r\\n'\cf5  \cf9 +\cf5 \cb1 \
-\cb3         \cf13 JSON\cf9 .\cf5 stringify\cf9 (\{\cf5 \cb1 \
-\cb3             inputs\cf9 :\cf5  \cf9 \{\cf5 \cb1 \
-\cb3                 keyword\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 (),\cf5 \cb1 \
-\cb3                 market\cf9 :\cf5  document\cf9 .\cf5 getElementById\cf9 (\cf10 'target-market'\cf9 ).\cf5 value\cf9 ,\cf5 \cb1 \
-\cb3                 model\cf9 :\cf5  document\cf9 .\cf5 querySelector\cf9 (\cf10 'input[name="business-model"]:checked'\cf9 ).\cf5 value\cb1 \
-\cb3             \cf9 \},\cf5 \cb1 \
-\cb3             results\cf9 :\cf5  state\cf9 .\cf5 currentResults\cb1 \
-\cb3         \cf9 \})\cf5  \cf9 +\cf5 \cb1 \
-\cb3         close_delim\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 try\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 request\cf9 (\{\cf5 \cb1 \
-\cb3             path\cf9 :\cf5  \cf10 '/upload/drive/v3/files'\cf9 ,\cf5 \cb1 \
-\cb3             method\cf9 :\cf5  \cf10 'POST'\cf9 ,\cf5 \cb1 \
-\cb3             params\cf9 :\cf5  \cf9 \{\cf5  uploadType\cf9 :\cf5  \cf10 'multipart'\cf5  \cf9 \},\cf5 \cb1 \
-\cb3             headers\cf9 :\cf5  \cf9 \{\cf5  \cf10 'Content-Type'\cf9 :\cf5  \cf10 'multipart/related; boundary="'\cf5  \cf9 +\cf5  boundary \cf9 +\cf5  \cf10 '"'\cf5  \cf9 \},\cf5 \cb1 \
-\cb3             body\cf9 :\cf5  multipartRequestBody\cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Save Successful'\cf9 ,\cf5  \cf10 'Analysis has been saved to your Google Drive.'\cf9 ,\cf5  \cf10 'success'\cf9 );\cf5 \cb1 \
-\cb3         loadAnalysisHistory\cf9 ();\cf5  \cf8 // Refresh history\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 catch\cf5  \cf9 (\cf5 e\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         console\cf9 .\cf5 error\cf9 (\cf5 e\cf9 );\cf5 \cb1 \
-\cb3         showAlert\cf9 (\cf10 'Save Failed'\cf9 ,\cf5  \cf10 'Could not save the analysis to Google Drive.'\cf9 ,\cf5  \cf10 'error'\cf9 );\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  loadAnalysisHistory\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 state\cf9 .\cf5 driveFolderId\cf9 )\cf5  \cf12 return\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 drive\cf9 .\cf5 files\cf9 .\cf5 list\cf9 (\{\cf5 \cb1 \
-\cb3         q\cf9 :\cf5  \cf10 `'\cf9 $\{\cf5 state\cf9 .\cf5 driveFolderId\cf9 \}\cf10 ' in parents and trashed=false`\cf9 ,\cf5 \cb1 \
-\cb3         fields\cf9 :\cf5  \cf10 'files(id, name, createdTime)'\cf9 ,\cf5 \cb1 \
-\cb3         orderBy\cf9 :\cf5  \cf10 'createdTime desc'\cf5 \cb1 \
-\cb3     \cf9 \});\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 const\cf5  files \cf9 =\cf5  response\cf9 .\cf5 result\cf9 .\cf5 files\cf9 ;\cf5 \cb1 \
-\cb3     ui\cf9 .\cf5 historyList\cf9 .\cf5 innerHTML \cf9 =\cf5  \cf10 ''\cf9 ;\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 files \cf9 &&\cf5  files\cf9 .\cf5 length \cf9 >\cf5  \cf15 0\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         files\cf9 .\cf5 forEach\cf9 (\cf5 file \cf9 =>\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf12 const\cf5  fileEl \cf9 =\cf5  document\cf9 .\cf5 createElement\cf9 (\cf10 'div'\cf9 );\cf5 \cb1 \
-\cb3             fileEl\cf9 .\cf5 className \cf9 =\cf5  \cf10 'border p-3 rounded-lg flex justify-between items-center'\cf9 ;\cf5 \cb1 \
-\cb3             fileEl\cf9 .\cf5 innerHTML \cf9 =\cf5  \cf10 `\cf5 \cb1 \
-\cf10 \cb3                 <div>\cf5 \cb1 \
-\cf10 \cb3                     <p class="font-semibold">\cf9 $\{\cf5 file\cf9 .\cf5 name\cf9 .\cf5 replace\cf9 (\cf10 '.json'\cf9 ,\cf5  \cf10 ''\cf9 )\}\cf10 </p>\cf5 \cb1 \
-\cf10 \cb3                     <p class="text-sm text-gray-500">Saved on: \cf9 $\{\cf12 new\cf5  \cf13 Date\cf9 (\cf5 file\cf9 .\cf5 createdTime\cf9 ).\cf5 toLocaleDateString\cf9 ()\}\cf10 </p>\cf5 \cb1 \
-\cf10 \cb3                 </div>\cf5 \cb1 \
-\cf10 \cb3                 <div>\cf5 \cb1 \
-\cf10 \cb3                     <button data-id="\cf9 $\{\cf5 file\cf9 .\cf5 id\cf9 \}\cf10 " class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">
-\f1 \'b8\'fc\'a4\'4a
-\f0 </button>\cf5 \cb1 \
-\cf10 \cb3                 </div>\cf5 \cb1 \
-\cf10 \cb3             `\cf9 ;\cf5 \cb1 \
-\cb3             ui\cf9 .\cf5 historyList\cf9 .\cf5 appendChild\cf9 (\cf5 fileEl\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \});\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 else\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         ui\cf9 .\cf5 historyList\cf9 .\cf5 innerHTML \cf9 =\cf5  \cf10 '<p class="text-gray-500">
-\f1 \'a8\'53\'a6\'b3\'be\'fa\'a5\'76\'ac\'f6\'bf\'fd\'a1\'43
-\f0 </p>'\cf9 ;\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 async\cf5  \cf12 function\cf5  handleHistoryAction\cf9 (\cf5 e\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 e\cf9 .\cf5 target\cf9 .\cf5 classList\cf9 .\cf5 contains\cf9 (\cf10 'load-history-btn'\cf9 ))\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         \cf12 const\cf5  fileId \cf9 =\cf5  e\cf9 .\cf5 target\cf9 .\cf5 dataset\cf9 .\cf5 id\cf9 ;\cf5 \cb1 \
-\cb3         \cf12 try\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             \cf12 const\cf5  response \cf9 =\cf5  \cf12 await\cf5  gapi\cf9 .\cf5 client\cf9 .\cf5 drive\cf9 .\cf5 files\cf9 .\cf12 get\cf9 (\{\cf5 \cb1 \
-\cb3                 fileId\cf9 :\cf5  fileId\cf9 ,\cf5 \cb1 \
-\cb3                 alt\cf9 :\cf5  \cf10 'media'\cf5 \cb1 \
-\cb3             \cf9 \});\cf5 \cb1 \
-\cb3             \cf12 const\cf5  data \cf9 =\cf5  response\cf9 .\cf5 result\cf9 ;\cf5 \cb1 \
-\cb3             state\cf9 .\cf5 currentResults \cf9 =\cf5  data\cf9 .\cf5 results\cf9 ;\cf5 \cb1 \
-\cb3             renderAnalysisResults\cf9 (\cf5 data\cf9 .\cf5 results\cf9 );\cf5 \cb1 \
-\cb3             \cb1 \
-\cb3             \cf8 // Switch to results tab\cf5 \cb1 \
-\cb3             document\cf9 .\cf5 querySelector\cf9 (\cf10 '.tab-btn[data-tab="results"]'\cf9 ).\cf5 click\cf9 ();\cf5 \cb1 \
-\cb3             showAlert\cf9 (\cf10 'History Loaded'\cf9 ,\cf5  \cf10 'Successfully loaded analysis from history.'\cf9 ,\cf5  \cf10 'info'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \}\cf5  \cf12 catch\cf5  \cf9 (\cf5 error\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3             console\cf9 .\cf5 error\cf9 (\cf5 error\cf9 );\cf5 \cb1 \
-\cb3             showAlert\cf9 (\cf10 'Load Failed'\cf9 ,\cf5  \cf10 'Could not load the selected history item.'\cf9 ,\cf5  \cf10 'error'\cf9 );\cf5 \cb1 \
-\cb3         \cf9 \}\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  handleResultAction\cf9 (\cf5 e\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (\cf5 e\cf9 .\cf5 target\cf9 .\cf5 id \cf9 ===\cf5  \cf10 'save-analysis-btn'\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         saveAnalysisToDrive\cf9 ();\cf5 \cb1 \
-\cb3     \cf9 \}\cf5  \cf12 else\cf5  \cf12 if\cf5  \cf9 (\cf5 e\cf9 .\cf5 target\cf9 .\cf5 id \cf9 ===\cf5  \cf10 'export-excel-btn'\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         exportToExcel\cf9 ();\cf5 \cb1 \
-\cb3     \cf9 \}\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf12 \cb3 function\cf5  exportToExcel\cf9 ()\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 if\cf5  \cf9 (!\cf5 state\cf9 .\cf5 currentResults\cf9 )\cf5  \cf12 return\cf9 ;\cf5 \cb1 \
-\
-\cb3     \cf12 const\cf5  wb \cf9 =\cf5  \cf13 XLSX\cf9 .\cf5 utils\cf9 .\cf5 book_new\cf9 ();\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf8 // Keywords sheet\cf5 \cb1 \
-\cb3     \cf12 const\cf5  wsKeywords \cf9 =\cf5  \cf13 XLSX\cf9 .\cf5 utils\cf9 .\cf5 json_to_sheet\cf9 (\cf5 state\cf9 .\cf5 currentResults\cf9 .\cf5 keywords\cf9 );\cf5 \cb1 \
-\cb3     \cf13 XLSX\cf9 .\cf5 utils\cf9 .\cf5 book_append_sheet\cf9 (\cf5 wb\cf9 ,\cf5  wsKeywords\cf9 ,\cf5  \cf10 "
-\f1 \'c3\'f6\'c1\'e4\'a6\'72\'a4\'c0\'aa\'52
-\f0 "\cf9 );\cf5 \cb1 \
-\
-\cb3     \cf8 // Competitors sheet\cf5 \cb1 \
-\cb3     \cf12 const\cf5  competitorsForSheet \cf9 =\cf5  state\cf9 .\cf5 currentResults\cf9 .\cf5 competitors\cf9 .\cf5 map\cf9 (\cf5 c \cf9 =>\cf5  \cf9 (\{\cf5 \cb1 \
-\cb3         \cf10 '
-\f1 \'ab\'7e\'b5\'50\'a6\'57\'ba\'d9
-\f0 '\cf9 :\cf5  c\cf9 .\cf5 brandName\cf9 ,\cf5 \cb1 \
-\cb3         \cf10 '
-\f1 \'b7\'7e\'b0\'c8\'ba\'4b\'ad\'6e
-\f0 '\cf9 :\cf5  c\cf9 .\cf5 summary\cf9 ,\cf5 \cb1 \
-\cb3         \cf10 '
-\f1 \'c3\'fe\'ab\'ac
-\f0 '\cf9 :\cf5  c\cf9 .\cf5 companyType\cf9 ,\cf5 \cb1 \
-\cb3         \cf10 '
-\f1 \'ba\'f4\'af\'b8
-\f0 '\cf9 :\cf5  c\cf9 .\cf5 websiteUrl\cf9 ,\cf5 \cb1 \
-\cb3         \cf10 'LinkedIn'\cf9 :\cf5  c\cf9 .\cf5 linkedinUrl\cf9 ,\cf5 \cb1 \
-\cb3     \cf9 \}));\cf5 \cb1 \
-\cb3     \cf12 const\cf5  wsCompetitors \cf9 =\cf5  \cf13 XLSX\cf9 .\cf5 utils\cf9 .\cf5 json_to_sheet\cf9 (\cf5 competitorsForSheet\cf9 );\cf5 \cb1 \
-\cb3     \cf13 XLSX\cf9 .\cf5 utils\cf9 .\cf5 book_append_sheet\cf9 (\cf5 wb\cf9 ,\cf5  wsCompetitors\cf9 ,\cf5  \cf10 "
-\f1 \'c4\'76\'aa\'a7\'b9\'ef\'a4\'e2\'a4\'c0\'aa\'52
-\f0 "\cf9 );\cf5 \cb1 \
-\cb3     \cb1 \
-\cb3     \cf12 const\cf5  filename \cf9 =\cf5  \cf10 `\cf9 $\{\cf5 document\cf9 .\cf5 getElementById\cf9 (\cf10 'core-keyword'\cf9 ).\cf5 value\cf9 .\cf5 trim\cf9 ()\}\cf10 _Analysis.xlsx`\cf9 ;\cf5 \cb1 \
-\cb3     \cf13 XLSX\cf9 .\cf5 writeFile\cf9 (\cf5 wb\cf9 ,\cf5  filename\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf8 \cb3 // --- 10. Utility Functions ---\cf5 \cb1 \
-\cf12 \cb3 function\cf5  showAlert\cf9 (\cf5 title\cf9 ,\cf5  message\cf9 ,\cf5  type \cf9 =\cf5  \cf10 'info'\cf9 )\cf5  \cf9 \{\cf5 \cb1 \
-\cb3     \cf12 const\cf5  colors \cf9 =\cf5  \cf9 \{\cf5 \cb1 \
-\cb3         info\cf9 :\cf5  \cf10 'bg-blue-100 border-blue-500 text-blue-700'\cf9 ,\cf5 \cb1 \
-\cb3         success\cf9 :\cf5  \cf10 'bg-green-100 border-green-500 text-green-700'\cf9 ,\cf5 \cb1 \
-\cb3         warning\cf9 :\cf5  \cf10 'bg-yellow-100 border-yellow-500 text-yellow-700'\cf9 ,\cf5 \cb1 \
-\cb3         error\cf9 :\cf5  \cf10 'bg-red-100 border-red-500 text-red-700'\cf9 ,\cf5 \cb1 \
-\cb3     \cf9 \};\cf5 \cb1 \
-\cb3     \cf12 const\cf5  alertEl \cf9 =\cf5  document\cf9 .\cf5 createElement\cf9 (\cf10 'div'\cf9 );\cf5 \cb1 \
-\cb3     alertEl\cf9 .\cf5 className \cf9 =\cf5  \cf10 `p-4 mb-4 rounded-md shadow-lg border-l-4 \cf9 $\{\cf5 colors\cf9 [\cf5 type\cf9 ]\}\cf10 `\cf9 ;\cf5 \cb1 \
-\cb3     alertEl\cf9 .\cf5 innerHTML \cf9 =\cf5  \cf10 `<div class="flex"><div class="ml-3"><p class="font-bold">\cf9 $\{\cf5 title\cf9 \}\cf10 </p><p class="text-sm">\cf9 $\{\cf5 message\cf9 \}\cf10 </p></div></div>`\cf9 ;\cf5 \cb1 \
-\cb3     document\cf9 .\cf5 getElementById\cf9 (\cf10 'alert-container'\cf9 ).\cf5 prepend\cf9 (\cf5 alertEl\cf9 );\cf5 \cb1 \
-\cb3     setTimeout\cf9 (()\cf5  \cf9 =>\cf5  alertEl\cf9 .\cf5 remove\cf9 (),\cf5  \cf15 5000\cf9 );\cf5 \cb1 \
-\cf9 \cb3 \}\cf5 \cb1 \
-\
-\cf6 \cb3 </\cf2 script\cf6 >\cf5 \cb1 \
-\cf6 \cb3 </\cf2 body\cf6 >\cf5 \cb1 \
-\cf6 \cb3 </\cf2 html\cf6 >\cf5 \cb1 \
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-6 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-gray-800">市場情資與競品分析平台</h1>
+            <div id="auth-container">
+                <button id="authorize_button" class="hidden bg-indigo-600 text-white font-semibold px-4 py-2 rounded-lg hover:bg-indigo-700 transition">使用 Google 帳戶登入</button>
+                <div id="user-profile" class="hidden items-center gap-3">
+                    <img id="user-avatar" class="w-10 h-10 rounded-full" src="" alt="User Avatar">
+                    <span id="user-name" class="font-semibold text-gray-700"></span>
+                    <button id="signout_button" class="text-sm text-gray-500 hover:text-gray-800">登出</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-6 py-8">
+        <!-- App Container -->
+        <div id="app-container" class="locked">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Left Panel: Controls & Settings -->
+                <div class="lg:col-span-1 space-y-6">
+                    <!-- API Settings -->
+                    <section id="settings-section" class="bg-white p-6 rounded-lg shadow-lg">
+                        <h2 class="text-xl font-bold mb-4">API & 應用程式設定</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="google-api-key" class="block text-sm font-medium text-gray-700">Google API 金鑰</label>
+                                <input type="password" id="google-api-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 Google API 金鑰">
+                            </div>
+                            <div>
+                                <label for="search-engine-id" class="block text-sm font-medium text-gray-700">可程式化搜尋引擎 ID (CX)</label>
+                                <input type="text" id="search-engine-id" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 CX ID">
+                            </div>
+                             <div>
+                                <label for="ai-provider" class="block text-sm font-medium text-gray-700">AI 模型提供商</label>
+                                <select id="ai-provider" class="mt-1 w-full p-2 border rounded-md">
+                                    <option value="gemini">Google Gemini</option>
+                                    <option value="monica">Monica (Coming Soon)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label for="ai-api-key" class="block text-sm font-medium text-gray-700">AI API 金鑰</label>
+                                <input type="password" id="ai-api-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 AI API 金鑰">
+                            </div>
+                            <button id="save-settings-btn" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">儲存並啟用設定</button>
+                        </div>
+                    </section>
+                    
+                    <!-- Analysis Input -->
+                    <section id="analysis-input-section" class="bg-white p-6 rounded-lg shadow-lg locked">
+                         <h2 class="text-xl font-bold mb-4">分析目標</h2>
+                         <div class="space-y-4">
+                             <div>
+                                <label for="core-keyword" class="block text-sm font-medium text-gray-700">行業/品牌/產品關鍵字</label>
+                                <input type="text" id="core-keyword" class="mt-1 w-full p-2 border rounded-md" placeholder="例如：電動車, SaaS">
+                            </div>
+                            <div>
+                                <label for="target-market" class="block text-sm font-medium text-gray-700">目標市場</label>
+                                <select id="target-market" class="mt-1 w-full p-2 border rounded-md">
+                                    <option value="us|en">美國 (English)</option>
+                                    <option value="jp|ja">日本 (日本語)</option>
+                                    <option value="tw|zh-TW">台灣 (繁體中文)</option>
+                                    <option value="de|de">德國 (Deutsch)</option>
+                                    <option value="fr|fr">法國 (Français)</option>
+                                </select>
+                            </div>
+                             <div>
+                                <label class="block text-sm font-medium text-gray-700">商業模式</label>
+                                <div class="mt-2 space-x-4">
+                                    <label><input type="radio" name="business-model" value="B2C" checked> B2C</label>
+                                    <label><input type="radio" name="business-model" value="B2B"> B2B</label>
+                                </div>
+                            </div>
+                            <button id="start-analysis-btn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">開始分析</button>
+                         </div>
+                    </section>
+                </div>
+
+                <!-- Right Panel: Results & History -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="bg-white rounded-lg shadow-lg">
+                        <div class="flex border-b">
+                            <button data-tab="results" class="tab-btn tab active flex-1 p-4 font-semibold">分析結果</button>
+                            <button data-tab="history" class="tab-btn tab flex-1 p-4 font-semibold">歷史紀錄</button>
+                        </div>
+
+                        <!-- Results Panel -->
+                        <div id="results-panel" class="panel active p-6">
+                           <div id="results-content" class="min-h-[400px]">
+                                <div id="loading-indicator" class="hidden flex flex-col items-center justify-center h-full">
+                                    <div class="spinner"></div>
+                                    <p id="loading-status" class="mt-4 text-gray-600 font-medium">正在準備分析...</p>
+                                </div>
+                               <div id="results-tabs-container"></div>
+                           </div>
+                           <div id="results-actions" class="hidden mt-4 flex gap-4">
+                               <button id="save-analysis-btn" class="flex-1 bg-blue-600 text-white font-bold py-2 rounded-lg hover:bg-blue-700">儲存本次分析</button>
+                               <button id="export-excel-btn" class="flex-1 bg-gray-700 text-white font-bold py-2 rounded-lg hover:bg-gray-800">匯出為 Excel</button>
+                           </div>
+                        </div>
+
+                        <!-- History Panel -->
+                        <div id="history-panel" class="panel p-6 min-h-[400px]">
+                            <div id="history-list" class="space-y-4">
+                                <p class="text-gray-500">沒有歷史紀錄。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+<script>
+// --- Client-Side Application Logic ---
+
+// --- 1. State and Configuration ---
+const state = {
+    gapiReady: false,
+    gisReady: false,
+    tokenClient: null,
+    accessToken: null,
+    userProfile: null,
+    driveFolderId: null,
+    apiKeys: {
+        google: null,
+        searchEngineId: null,
+        aiProvider: 'gemini',
+        ai: null
+    },
+    isApiReady: false,
+    currentResults: null
+};
+
+const CONFIG = {
+    // IMPORTANT: Replace with your actual Google Cloud Project's Client ID
+    CLIENT_ID: "733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com",
+    // Scopes requested by the application
+    SCOPES: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
+    DRIVE_FOLDER_NAME: "MarketingAnalysisTool_Data"
+};
+
+// --- 2. Element References ---
+const ui = {
+    authorizeButton: document.getElementById('authorize_button'),
+    signOutButton: document.getElementById('signout_button'),
+    authContainer: document.getElementById('auth-container'),
+    userProfile: document.getElementById('user-profile'),
+    appContainer: document.getElementById('app-container'),
+    settingsSection: document.getElementById('settings-section'),
+    analysisSection: document.getElementById('analysis-input-section'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    startAnalysisBtn: document.getElementById('start-analysis-btn'),
+    loadingIndicator: document.getElementById('loading-indicator'),
+    loadingStatus: document.getElementById('loading-status'),
+    resultsContainer: document.getElementById('results-tabs-container'),
+    resultsActions: document.getElementById('results-actions'),
+    historyList: document.getElementById('history-list'),
+};
+
+// --- 3. Initialization ---
+window.onload = () => {
+    // Load Google's API client and Identity Services scripts
+    gapi.load('client', gapiLoaded);
+    const gisScript = document.createElement('script');
+    gisScript.src = 'https://accounts.google.com/gsi/client';
+    gisScript.async = true;
+    gisScript.defer = true;
+    gisScript.onload = gisLoaded;
+    document.body.appendChild(gisScript);
+
+    // Setup event listeners
+    setupEventListeners();
+};
+
+function setupEventListeners() {
+    ui.authorizeButton.onclick = handleAuthClick;
+    ui.signOutButton.onclick = handleSignOutClick;
+    ui.saveSettingsBtn.onclick = handleSaveSettings;
+    ui.startAnalysisBtn.onclick = startAnalysisWorkflow;
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            // Manage button styles
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            // Manage panel visibility
+            document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${tab}-panel`).classList.add('active');
+        });
+    });
+    
+    // Delegated event listeners for dynamically created content
+    document.getElementById('history-list').addEventListener('click', handleHistoryAction);
+    document.getElementById('results-actions').addEventListener('click', handleResultAction);
 }
+
+
+// --- 4. Authentication & Authorization ---
+function gapiLoaded() {
+    gapi.client.init({}).then(() => {
+        state.gapiReady = true;
+        maybeEnableAuthButton();
+    });
+}
+
+function gisLoaded() {
+    state.tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: CONFIG.CLIENT_ID,
+        scope: CONFIG.SCOPES,
+        callback: gisInCallback,
+    });
+    state.gisReady = true;
+    maybeEnableAuthButton();
+}
+
+function maybeEnableAuthButton() {
+    if (state.gapiReady && state.gisReady) {
+        ui.authorizeButton.classList.remove('hidden');
+    }
+}
+
+function gisInCallback(resp) {
+    if (resp.error) {
+        showAlert('Authentication Error', resp.error, 'error');
+        return;
+    }
+    state.accessToken = resp;
+    gapi.client.setToken(state.accessToken);
+    handleSuccessfulLogin();
+}
+
+function handleAuthClick() {
+    if (gapi.client.getToken() === null) {
+        state.tokenClient.requestAccessToken({ prompt: 'consent' });
+    } else {
+        state.tokenClient.requestAccessToken({ prompt: '' });
+    }
+}
+
+async function handleSuccessfulLogin() {
+    ui.authorizeButton.classList.add('hidden');
+    ui.userProfile.classList.remove('hidden');
+    ui.userProfile.classList.add('flex');
+    ui.appContainer.classList.remove('locked');
+
+    // Fetch and display user profile
+    const profile = await gapi.client.oauth2.userinfo.get();
+    state.userProfile = profile.result;
+    document.getElementById('user-avatar').src = state.userProfile.picture;
+    document.getElementById('user-name').textContent = state.userProfile.given_name || state.userProfile.name;
+
+    // Load saved settings and check for Drive folder
+    loadSettingsFromLocalStorage();
+    await setupGoogleDrive();
+    loadAnalysisHistory();
+}
+
+function handleSignOutClick() {
+    const token = gapi.client.getToken();
+    if (token !== null) {
+        google.accounts.oauth2.revoke(token.access_token, () => {
+            gapi.client.setToken('');
+            state.accessToken = null;
+            state.userProfile = null;
+            
+            ui.userProfile.classList.add('hidden');
+            ui.authorizeButton.classList.remove('hidden');
+            ui.appContainer.classList.add('locked');
+            ui.analysisSection.classList.add('locked');
+        });
+    }
+}
+
+
+// --- 5. API Settings ---
+function handleSaveSettings() {
+    const googleApiKey = document.getElementById('google-api-key').value.trim();
+    const searchEngineId = document.getElementById('search-engine-id').value.trim();
+    const aiProvider = document.getElementById('ai-provider').value;
+    const aiApiKey = document.getElementById('ai-api-key').value.trim();
+    
+    if (!googleApiKey || !searchEngineId || !aiApiKey) {
+        showAlert('Information Missing', 'Please fill in all API key and ID fields.', 'warning');
+        return;
+    }
+
+    state.apiKeys = {
+        google: googleApiKey,
+        searchEngineId: searchEngineId,
+        aiProvider: aiProvider,
+        ai: aiApiKey
+    };
+    
+    // "Encrypt" by base64 encoding for simple obfuscation in local storage
+    localStorage.setItem('marketingToolApiKeys', btoa(JSON.stringify(state.apiKeys)));
+    state.isApiReady = true;
+    ui.analysisSection.classList.remove('locked');
+    showAlert('Settings Saved', 'API settings have been saved and activated.', 'success');
+}
+
+function loadSettingsFromLocalStorage() {
+    const savedKeys = localStorage.getItem('marketingToolApiKeys');
+    if (savedKeys) {
+        try {
+            const decodedKeys = JSON.parse(atob(savedKeys));
+            state.apiKeys = decodedKeys;
+            state.isApiReady = true;
+            
+            // Populate fields
+            document.getElementById('google-api-key').value = state.apiKeys.google || '';
+            document.getElementById('search-engine-id').value = state.apiKeys.searchEngineId || '';
+            document.getElementById('ai-provider').value = state.apiKeys.aiProvider || 'gemini';
+            document.getElementById('ai-api-key').value = state.apiKeys.ai || '';
+
+            ui.analysisSection.classList.remove('locked');
+        } catch (e) {
+            console.error("Failed to parse saved API keys:", e);
+            localStorage.removeItem('marketingToolApiKeys');
+        }
+    }
+}
+
+
+// --- 6. Google Drive Integration ---
+async function setupGoogleDrive() {
+    await gapi.client.load('drive', 'v3');
+    const response = await gapi.client.drive.files.list({
+        q: `name='${CONFIG.DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        fields: 'files(id, name)'
+    });
+    
+    if (response.result.files.length > 0) {
+        state.driveFolderId = response.result.files[0].id;
+    } else {
+        const fileMetadata = {
+            'name': CONFIG.DRIVE_FOLDER_NAME,
+            'mimeType': 'application/vnd.google-apps.folder'
+        };
+        const createResponse = await gapi.client.drive.files.create({
+            resource: fileMetadata,
+            fields: 'id'
+        });
+        state.driveFolderId = createResponse.result.id;
+    }
+}
+
+
+// --- 7. Main Analysis Workflow ---
+async function startAnalysisWorkflow() {
+    if (!state.isApiReady) {
+        showAlert('API Not Ready', 'Please save your API settings first.', 'error');
+        return;
+    }
+
+    const coreKeyword = document.getElementById('core-keyword').value.trim();
+    if (!coreKeyword) {
+        showAlert('Input Required', 'Please enter an industry, brand, or product keyword.', 'warning');
+        return;
+    }
+
+    ui.loadingIndicator.classList.remove('hidden');
+    ui.resultsContainer.innerHTML = ''; // Clear previous results
+    ui.resultsActions.classList.add('hidden');
+
+    try {
+        // Step 1: Generate Keywords
+        ui.loadingStatus.textContent = '步驟 1/3: 正在生成行業關鍵字...';
+        const keywordData = await getAiKeywordAnalysis();
+        state.currentResults = { keywords: keywordData.keywords || [] };
+        
+        // Step 2: Competitor Analysis
+        ui.loadingStatus.textContent = '步驟 2/3: 正在搜尋競爭對手...';
+        const searchResults = await performGoogleSearch(state.currentResults.keywords);
+        
+        ui.loadingStatus.textContent = '步驟 3/3: 正在分析競爭對手資訊...';
+        const competitorData = await getAiCompetitorAnalysis(searchResults);
+        state.currentResults.competitors = competitorData.competitors || [];
+
+        // Step 3: Render results
+        renderAnalysisResults(state.currentResults);
+
+    } catch (error) {
+        console.error("Analysis failed:", error);
+        showAlert('Analysis Failed', `An error occurred: ${error.message}`, 'error');
+    } finally {
+        ui.loadingIndicator.classList.add('hidden');
+    }
+}
+
+// --- 8. API Call Functions ---
+async function getAiKeywordAnalysis() {
+    const marketInfo = document.getElementById('target-market').value.split('|');
+    const prompt = `
+        You are a senior SEO and market analysis expert specializing in the ${marketInfo[0]} market.
+        Please generate a detailed keyword analysis report based on the following criteria:
+        - Core Topic: "${document.getElementById('core-keyword').value}"
+        - Business Model: "${document.querySelector('input[name="business-model"]:checked').value}"
+        - Target Language: "${marketInfo[1]}"
+        
+        Provide 20 relevant keywords, including short-tail, mid-tail, and long-tail variations. For each keyword, assess its "Search Volume Level" (High, Medium, Low) and "Keyword Type" (e.g., Brand, Product, Comparison, Question, Informational).
+        
+        Return the response strictly in the following JSON format:
+        { "keywords": [{ "keyword": "...", "volume": "High", "type": "Product" }, ...] }`;
+
+    const response = await callGeminiAPI(prompt);
+    return JSON.parse(response);
+}
+
+async function performGoogleSearch(keywords) {
+    if (!keywords || keywords.length === 0) return [];
+    
+    // Select top 3 high-volume keywords for the query
+    const query = keywords.filter(k => k.volume === 'High').slice(0, 3).map(k => k.keyword).join(' OR ');
+    if (!query) return [];
+
+    const marketInfo = document.getElementById('target-market').value.split('|');
+    
+    const response = await gapi.client.request({
+        'path': `https://customsearch.googleapis.com/customsearch/v1`,
+        'params': {
+            'key': state.apiKeys.google,
+            'cx': state.apiKeys.searchEngineId,
+            'q': query,
+            'cr': `country${marketInfo[0].toUpperCase()}`
+        }
+    });
+
+    return response.result.items || [];
+}
+
+async function getAiCompetitorAnalysis(searchResults) {
+    if (searchResults.length === 0) return { competitors: [] };
+
+    const context = searchResults.slice(0, 10).map(item => `Title: ${item.title}\nURL: ${item.link}\nSnippet: ${item.snippet}`).join('\n\n');
+    
+    const prompt = `
+        You are a market intelligence analyst. Below are Google search results for "${document.getElementById('core-keyword').value}". Please analyze them and identify the 5 most significant competitors.
+        
+        For each competitor, complete the following tasks:
+        1. Identify their official brand name and main website URL.
+        2. Summarize their core business in Traditional Chinese (max 30 words) based on their website snippet.
+        3. Find their official LinkedIn company page URL. Return "N/A" if not found.
+        4. Classify their business into one of the following types: [SaaS, Hardware Manufacturer, Consulting Service, Retail E-commerce, Agency, Content Platform].
+        
+        Return the response strictly in the following JSON format:
+        { "competitors": [{ "brandName": "...", "websiteUrl": "...", "summary": "...", "linkedinUrl": "...", "companyType": "SaaS" }, ...] }
+        
+        Context from search results:
+        ${context}`;
+
+    const response = await callGeminiAPI(prompt);
+    return JSON.parse(response);
+}
+
+async function callGeminiAPI(prompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${state.apiKeys.ai}`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }]
+        })
+    });
+    if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(`Gemini API Error: ${errorBody.error.message}`);
+    }
+    const data = await response.json();
+    // Clean the response text to get valid JSON
+    let text = data.candidates[0].content.parts[0].text;
+    text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+    return text;
+}
+
+
+// --- 9. Rendering, History & Export ---
+function renderAnalysisResults(results) {
+    let html = `
+        <div class="flex border-b">
+            <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">關鍵字分析</button>
+            <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">競爭對手</button>
+        </div>
+        <div id="keywords-result-panel" class="result-panel active p-4">
+            <table class="w-full text-left">
+                <thead><tr class="border-b"><th class="py-2">關鍵字</th><th>搜尋量級</th><th>類型</th></tr></thead>
+                <tbody>${results.keywords.map(k => `<tr><td class="py-2">${k.keyword}</td><td>${k.volume}</td><td>${k.type}</td></tr>`).join('')}</tbody>
+            </table>
+        </div>
+        <div id="competitors-result-panel" class="result-panel p-4 space-y-4">
+             ${results.competitors.map(c => `
+                <div class="p-3 border rounded-lg">
+                    <p class="font-bold text-lg">${c.brandName}</p>
+                    <p class="text-sm text-gray-600">${c.summary}</p>
+                    <p class="mt-2 text-sm"><strong>類型:</strong> ${c.companyType}</p>
+                    <div class="mt-2 text-sm flex gap-4">
+                        <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline">網站</a>
+                        ${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline">LinkedIn</a>` : ''}
+                    </div>
+                </div>
+             `).join('')}
+        </div>
+    `;
+    ui.resultsContainer.innerHTML = html;
+    ui.resultsActions.classList.remove('hidden');
+
+    // Add event listeners for the new result tabs
+    document.querySelectorAll('.result-tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.resultTab;
+            document.querySelectorAll('.result-tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.querySelectorAll('.result-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById(`${tab}-result-panel`).classList.add('active');
+        });
+    });
+}
+
+async function saveAnalysisToDrive() {
+    if (!state.currentResults || !state.driveFolderId) return;
+
+    const metadata = {
+        name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`,
+        mimeType: 'application/json',
+        parents: [state.driveFolderId]
+    };
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const close_delim = `\r\n--${boundary}--`;
+
+    const multipartRequestBody =
+        delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        JSON.stringify(metadata) +
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        JSON.stringify({
+            inputs: {
+                keyword: document.getElementById('core-keyword').value.trim(),
+                market: document.getElementById('target-market').value,
+                model: document.querySelector('input[name="business-model"]:checked').value
+            },
+            results: state.currentResults
+        }) +
+        close_delim;
+
+    try {
+        await gapi.client.request({
+            path: '/upload/drive/v3/files',
+            method: 'POST',
+            params: { uploadType: 'multipart' },
+            headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
+            body: multipartRequestBody
+        });
+        showAlert('Save Successful', 'Analysis has been saved to your Google Drive.', 'success');
+        loadAnalysisHistory(); // Refresh history
+    } catch (e) {
+        console.error(e);
+        showAlert('Save Failed', 'Could not save the analysis to Google Drive.', 'error');
+    }
+}
+
+async function loadAnalysisHistory() {
+    if (!state.driveFolderId) return;
+
+    const response = await gapi.client.drive.files.list({
+        q: `'${state.driveFolderId}' in parents and trashed=false`,
+        fields: 'files(id, name, createdTime)',
+        orderBy: 'createdTime desc'
+    });
+    
+    const files = response.result.files;
+    ui.historyList.innerHTML = '';
+    if (files && files.length > 0) {
+        files.forEach(file => {
+            const fileEl = document.createElement('div');
+            fileEl.className = 'border p-3 rounded-lg flex justify-between items-center';
+            fileEl.innerHTML = `
+                <div>
+                    <p class="font-semibold">${file.name.replace('.json', '')}</p>
+                    <p class="text-sm text-gray-500">Saved on: ${new Date(file.createdTime).toLocaleDateString()}</p>
+                </div>
+                <div>
+                    <button data-id="${file.id}" class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">載入</button>
+                </div>
+            `;
+            ui.historyList.appendChild(fileEl);
+        });
+    } else {
+        ui.historyList.innerHTML = '<p class="text-gray-500">沒有歷史紀錄。</p>';
+    }
+}
+
+async function handleHistoryAction(e) {
+    if (e.target.classList.contains('load-history-btn')) {
+        const fileId = e.target.dataset.id;
+        try {
+            const response = await gapi.client.drive.files.get({
+                fileId: fileId,
+                alt: 'media'
+            });
+            const data = response.result;
+            state.currentResults = data.results;
+            renderAnalysisResults(data.results);
+            
+            // Switch to results tab
+            document.querySelector('.tab-btn[data-tab="results"]').click();
+            showAlert('History Loaded', 'Successfully loaded analysis from history.', 'info');
+        } catch (error) {
+            console.error(error);
+            showAlert('Load Failed', 'Could not load the selected history item.', 'error');
+        }
+    }
+}
+
+function handleResultAction(e) {
+    if (e.target.id === 'save-analysis-btn') {
+        saveAnalysisToDrive();
+    } else if (e.target.id === 'export-excel-btn') {
+        exportToExcel();
+    }
+}
+
+function exportToExcel() {
+    if (!state.currentResults) return;
+
+    const wb = XLSX.utils.book_new();
+    
+    // Keywords sheet
+    const wsKeywords = XLSX.utils.json_to_sheet(state.currentResults.keywords);
+    XLSX.utils.book_append_sheet(wb, wsKeywords, "關鍵字分析");
+
+    // Competitors sheet
+    const competitorsForSheet = state.currentResults.competitors.map(c => ({
+        '品牌名稱': c.brandName,
+        '業務摘要': c.summary,
+        '類型': c.companyType,
+        '網站': c.websiteUrl,
+        'LinkedIn': c.linkedinUrl,
+    }));
+    const wsCompetitors = XLSX.utils.json_to_sheet(competitorsForSheet);
+    XLSX.utils.book_append_sheet(wb, wsCompetitors, "競爭對手分析");
+    
+    const filename = `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`;
+    XLSX.writeFile(wb, filename);
+}
+
+// --- 10. Utility Functions ---
+function showAlert(title, message, type = 'info') {
+    const colors = {
+        info: 'bg-blue-100 border-blue-500 text-blue-700',
+        success: 'bg-green-100 border-green-500 text-green-700',
+        warning: 'bg-yellow-100 border-yellow-500 text-yellow-700',
+        error: 'bg-red-100 border-red-500 text-red-700',
+    };
+    const alertEl = document.createElement('div');
+    alertEl.className = `p-4 mb-4 rounded-md shadow-lg border-l-4 ${colors[type]}`;
+    alertEl.innerHTML = `<div class="flex"><div class="ml-3"><p class="font-bold">${title}</p><p class="text-sm">${message}</p></div></div>`;
+    document.getElementById('alert-container').prepend(alertEl);
+    setTimeout(() => alertEl.remove(), 5000);
+}
+
+</script>
+</body>
+</html>
