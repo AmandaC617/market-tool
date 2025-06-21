@@ -314,14 +314,20 @@ function checkAuthReady() {
       ui.authorizeButton.classList.remove('hidden');
       ui.userProfile.classList.add('hidden');
       ui.appContainer.classList.add('locked');
+      ui.analysisSection.classList.add('locked'); // 新增這行
     } else {
       ui.authorizeButton.classList.add('hidden');
       ui.userProfile.classList.remove('hidden');
       ui.appContainer.classList.remove('locked');
+      // 檢查API設定
+      if (state.isApiReady) {
+        ui.analysisSection.classList.remove('locked');
+      } else {
+        ui.analysisSection.classList.add('locked');
+      }
     }
   }
 }
-
 function handleAuthClick() {
   if (state.tokenClient) {
     state.tokenClient.requestAccessToken();
