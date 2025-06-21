@@ -269,6 +269,7 @@ function setupEventListeners() {
     document.querySelectorAll('.competitor-checkbox').forEach(cb => cb.checked = all);
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
+  ui.saveAnalysisBtn.onclick = saveAnalysisToDrive;
 }
 function showAlert(title, message, type = 'info') {
   const alertContainer = document.getElementById('alert-container');
@@ -670,7 +671,42 @@ function exportToExcel() {
   const context = getSearchContext();
   XLSX.writeFile(wb, `${context.topic || '分析'}_Analysis.xlsx`);
 }
+// ... 其他 function (如 exportToExcel) ...
 
+async function saveAnalysisToDrive() {
+  if (!state.accessToken) {
+    showAlert('未登入', '請先登入 Google 帳戶。', 'error');
+    return;
+  }
+  if (!state.currentResults) {
+    showAlert('尚無分析結果', '請先執行分析，產生資料。', 'warning');
+    return;
+  }
+  // 產生儲存內容 (你可根據需求改為 JSON、CSV等)
+  const fileContent = JSON.stringify(state.currentResults, null, 2);
+  const blob = new Blob([fileContent], {type: 'application/json'});
+  const metadata = {
+    name: `分析結果_${new Date().toISOString().slice(0,19).replace(/[-T:]/g, "")}.json`,
+    mimeType: 'application/json',
+    parents: state.driveFolderId ? [state.driveFolderId] : undefined
+  };
+
+  const form = new FormData();
+  form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
+  form.append('file', blob);
+
+  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+    method: 'POST',
+    headers: new Headers({ 'Authorization': 'Bearer ' + state.accessToken }),
+    body: form
+  });
+
+  if (response.ok) {
+    showAlert('成功', '分析結果已上傳到 Google Drive。', 'success');
+  } else {
+    showAlert('存檔失敗', (await response.json()).error?.message || '發生未知錯誤', 'error');
+  }
+}
 // ...（其餘如 Google Drive、showAlert 等維持原本即可）
 </script>
 </body>
