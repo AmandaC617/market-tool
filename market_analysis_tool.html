@@ -273,15 +273,16 @@ function setupEventListeners() {
   ui.saveAnalysisBtn.onclick = saveAnalysisToDrive;
 }
 function handleTabSwitch(event) {
-  const btn = event.target.closest('[data-tab]');
+  // 這是一個簡單範例，確保不會再報錯
+  // 你可以根據需求做分頁切換
+  const btn = event.target.closest('.tab-btn');
   if (!btn) return;
-  // 取消所有tab的active
   document.querySelectorAll('.tab-btn').forEach(tab => tab.classList.remove('active'));
-  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-  // 設定當前tab
   btn.classList.add('active');
-  const tabName = btn.getAttribute('data-tab');
-  document.getElementById(tabName + '-panel').classList.add('active');
+  const tab = btn.getAttribute('data-tab');
+  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
+  const activePanel = document.getElementById(tab + '-panel');
+  if (activePanel) activePanel.classList.add('active');
 }
 function checkAuthReady() {
   // 只要登入和API設定齊全，就解鎖分析欄位
