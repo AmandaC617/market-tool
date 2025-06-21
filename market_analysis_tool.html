@@ -327,25 +327,25 @@ function handleSaveSettings() {
     state.isApiReady = false;
     showAlert('設定不完整', '請至少填寫一組API金鑰。', 'warning');
   }
-  checkAuthReady(); 
+  checkAuthReady(); // <--- 關鍵：這裡要加
 }
 // ------ 登入/登出 UI 狀態控制 ------
 function checkAuthReady() {
+  // 若已登入且 API 設定完成，則解鎖分析欄位
   if (state.gapiReady && state.gisReady) {
     if (!state.accessToken) {
       ui.authorizeButton.classList.remove('hidden');
       ui.userProfile.classList.add('hidden');
       ui.appContainer.classList.add('locked');
-      ui.analysisSection.classList.add('locked'); 
+      ui.analysisSection.classList.add('locked');
     } else {
       ui.authorizeButton.classList.add('hidden');
       ui.userProfile.classList.remove('hidden');
       ui.appContainer.classList.remove('locked');
-      // API 設定完成才解除分析區塊的鎖定
       if (state.isApiReady) {
-        ui.analysisSection.classList.remove('locked'); 
+        ui.analysisSection.classList.remove('locked');
       } else {
-        ui.analysisSection.classList.add('locked'); 
+        ui.analysisSection.classList.add('locked');
       }
     }
   }
