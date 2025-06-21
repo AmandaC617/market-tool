@@ -270,7 +270,7 @@ function setupEventListeners() {
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
 }
-  function handleSaveSettings() {
+function handleSaveSettings() {
   state.apiKeys.google = document.getElementById('google-api-key').value.trim();
   state.apiKeys.searchEngineId = document.getElementById('search-engine-id').value.trim();
   state.apiKeys.gemini = document.getElementById('ai-gemini-key').value.trim();
