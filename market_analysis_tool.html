@@ -454,7 +454,20 @@ function renderCompetitorsTable(competitors) {
   document.getElementById("competitors-result-panel").innerHTML = html;
 }
 // ------ 分析主流程 ------
-async function startInitialAnalysis() {
+  if (!validateFields()) return;
+  function validateFields() {
+  let valid = false;
+  const fields = ['industry', 'sector', 'product', 'company'];
+  for (let id of fields) {
+    const val = document.getElementById(id).value.trim();
+    if (val) valid = true;
+  }
+  if (!valid) {
+    showAlert('需要輸入', '請至少填寫一個分析欄位（產業、行業、產品、公司）。', 'warning');
+  }
+  return valid;
+}
+  async function startInitialAnalysis() {
   if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); return; }
   const { industry, sector, product, company } = getSearchContext();
   if (!industry && !sector && !product && !company) { showAlert('需要輸入', '請至少填寫一個分析欄位。', 'warning'); return; }
@@ -493,6 +506,11 @@ async function startInitialAnalysis() {
   }
 }
 async function getAiKeywordAnalysis() {
+    // 新分析前重置排序狀態
+  keywordsSortKey = 'volume';
+  keywordsSortOrder = 'desc';
+  competitorsSortKey = '';
+  competitorsSortOrder = 'desc';
   const context = getSearchContext();
   const prompt = `
 你是一位專精於${context.businessModel}領域的市場分析專家。
@@ -648,6 +666,13 @@ function sortByKey(arr, key, order = 'desc', isNumber = false) {
   return [...arr].sort((a, b) => {
     let aVal = a[key] || '';
     let bVal = b[key] || '';
+    // volume 特殊處理
+    if (key === 'volume') {
+      const volumeMap = {'高': 3, '中': 2, '低': 1};
+      aVal = volumeMap[aVal] !== undefined ? volumeMap[aVal] : (parseFloat(aVal) || 0);
+      bVal = volumeMap[bVal] !== undefined ? volumeMap[bVal] : (parseFloat(bVal) || 0);
+      isNumber = true;
+    }
     if(isNumber) {
       aVal = parseFloat(aVal) || 0;
       bVal = parseFloat(bVal) || 0;
@@ -655,6 +680,8 @@ function sortByKey(arr, key, order = 'desc', isNumber = false) {
     if(aVal < bVal) return order === 'asc' ? -1 : 1;
     if(aVal > bVal) return order === 'asc' ? 1 : -1;
     return 0;
+  });
+}
   });
 }
 
