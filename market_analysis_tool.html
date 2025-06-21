@@ -212,6 +212,36 @@
     </div>
   </main>
 <script>
+  // ------ 登入/登出 UI 狀態控制 ------
+function checkAuthReady() {
+  if (state.gapiReady && state.gisReady) {
+    if (!state.accessToken) {
+      ui.authorizeButton.classList.remove('hidden');
+      ui.userProfile.classList.add('hidden');
+      ui.appContainer.classList.add('locked');
+    } else {
+      ui.authorizeButton.classList.add('hidden');
+      ui.userProfile.classList.remove('hidden');
+      ui.appContainer.classList.remove('locked');
+    }
+  }
+}
+
+// Google 登入回呼，取得 accessToken 後更新狀態
+function gisInCallback(response) {
+  if (response && response.access_token) {
+    state.accessToken = response.access_token;
+    checkAuthReady();
+    // 這裡可加載 user profile 等
+  }
+}
+
+// 登出流程
+function handleSignOutClick() {
+  state.accessToken = null;
+  state.userProfile = null;
+  checkAuthReady();
+}
 // ------ 狀態管理與 UI 元件 ------
 const state = {
   gapiReady: false, gisReady: false, tokenClient: null, accessToken: null, userProfile: null, driveFolderId: null,
