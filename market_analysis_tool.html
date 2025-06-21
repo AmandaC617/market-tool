@@ -58,7 +58,7 @@
                                 <label for="ai-provider" class="block text-sm font-medium text-gray-700">AI 模型提供商</label>
                                 <select id="ai-provider" class="mt-1 w-full p-2 border rounded-md">
                                     <option value="gemini">Google Gemini</option>
-                                    <option value="monica" disabled>Monica (即將支援)</option>
+                                    <option value="monica">Monica API</option>
                                 </select>
                             </div>
                             <div>
@@ -69,31 +69,34 @@
                         </div>
                     </section>
                     <section id="analysis-input-section" class="bg-white p-6 rounded-lg shadow-lg locked">
-                         <h2 class="text-xl font-bold mb-4">分析目標</h2>
-                         <div class="space-y-4">
-                             <div>
-                                <label for="core-keyword" class="block text-sm font-medium text-gray-700">行業/品牌/產品關鍵字</label>
-                                <input type="text" id="core-keyword" class="mt-1 w-full p-2 border rounded-md" placeholder="例如：電動車, SaaS">
+                        <h2 class="text-xl font-bold mb-4">分析目標</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="industry" class="block text-sm font-medium text-gray-700">產業名稱</label>
+                                <input type="text" id="industry" class="mt-1 w-full p-2 border rounded-md" placeholder="如：電子商務">
                             </div>
                             <div>
-                                <label for="target-market" class="block text-sm font-medium text-gray-700">目標市場</label>
-                                <select id="target-market" class="mt-1 w-full p-2 border rounded-md">
-                                    <option value="us|en|美國">美國 (English)</option>
-                                    <option value="jp|ja|日本">日本 (日本語)</option>
-                                    <option value="tw|zh-TW|台灣">台灣 (繁體中文)</option>
-                                    <option value="de|de|德國">德國 (Deutsch)</option>
-                                    <option value="fr|fr|法國">法國 (Français)</option>
-                                </select>
+                                <label for="sector" class="block text-sm font-medium text-gray-700">行業名稱</label>
+                                <input type="text" id="sector" class="mt-1 w-full p-2 border rounded-md" placeholder="如：零售">
                             </div>
-                             <div>
+                            <div>
+                                <label for="product" class="block text-sm font-medium text-gray-700">產品名稱</label>
+                                <input type="text" id="product" class="mt-1 w-full p-2 border rounded-md" placeholder="如：CRM軟體">
+                            </div>
+                            <div>
+                                <label for="company" class="block text-sm font-medium text-gray-700">公司名稱</label>
+                                <input type="text" id="company" class="mt-1 w-full p-2 border rounded-md" placeholder="如：Salesforce">
+                            </div>
+                            <div>
                                 <label class="block text-sm font-medium text-gray-700">商業模式</label>
                                 <div class="mt-2 space-x-4">
                                     <label><input type="radio" name="business-model" value="B2C" checked> B2C</label>
                                     <label><input type="radio" name="business-model" value="B2B"> B2B</label>
+                                    <label><input type="radio" name="business-model" value="B2B2C"> B2B2C</label>
                                 </div>
                             </div>
                             <button id="start-analysis-btn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">開始分析</button>
-                         </div>
+                        </div>
                     </section>
                 </div>
                 <div class="lg:col-span-2 space-y-6">
@@ -301,10 +304,24 @@ async function setupGoogleDrive() {
     }
 }
 
+function getSearchContext() {
+    const industry = document.getElementById('industry').value.trim();
+    const sector = document.getElementById('sector').value.trim();
+    const product = document.getElementById('product').value.trim();
+    const company = document.getElementById('company').value.trim();
+    const businessModel = document.querySelector('input[name="business-model"]:checked').value;
+    let topic = '';
+    if (industry) topic += `產業:${industry} `;
+    if (sector) topic += `行業:${sector} `;
+    if (product) topic += `產品:${product} `;
+    if (company) topic += `公司:${company}`;
+    return { topic: topic.trim(), businessModel, industry, sector, product, company };
+}
+
 async function startAnalysisWorkflow() {
     if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); return; }
-    const coreKeyword = document.getElementById('core-keyword').value.trim();
-    if (!coreKeyword) { showAlert('需要輸入', '請輸入行業、品牌或產品關鍵字。', 'warning'); return; }
+    const { industry, sector, product, company } = getSearchContext();
+    if (!industry && !sector && !product && !company) { showAlert('需要輸入', '請至少填寫一個分析欄位。', 'warning'); return; }
 
     ui.loadingIndicator.classList.remove('hidden');
     ui.spinner.classList.remove('hidden');
@@ -312,7 +329,7 @@ async function startAnalysisWorkflow() {
     ui.resultsContainer.classList.add('hidden');
     
     try {
-        ui.loadingStatus.textContent = '步驟 1/3: 正在生成行業關鍵字...';
+        ui.loadingStatus.textContent = '步驟 1/3: 正在生成關鍵字...';
         const keywordsResponse = await getAiKeywordAnalysis();
         state.currentResults = { keywords: keywordsResponse.keywords || [] };
 
@@ -331,7 +348,8 @@ async function startAnalysisWorkflow() {
             companyType: c.companyType || '',
             linkedinUrl: c.linkedinUrl || '',
             stockCode: c.stockCode || '',
-            zipcode: c.zipcode || ''
+            zipcode: c.zipcode || '',
+            monicaApiScore: c.monicaApiScore || ''
         }));
 
         renderPartialResults('competitors');
@@ -346,8 +364,13 @@ async function startAnalysisWorkflow() {
 }
 
 async function getAiKeywordAnalysis() {
-    const marketInfo = document.getElementById('target-market').value.split('|');
-    const prompt = `你是一位專精於 ${marketInfo[2]} 市場的資深SEO與市場分析專家。請針對以下條件，生成一份詳細的關鍵字分析報告：- 核心主題: "${document.getElementById('core-keyword').value}" - 請至少列出10個關鍵字，並針對每個關鍵字給出「搜尋量級」(高/中/低)、「類型」(品牌、產品、通用、趨勢等)。請以 JSON 格式輸出，如：{"keywords":[{"keyword":"xxx","volume":"高","type":"品牌"},...]}`;
+    const context = getSearchContext();
+    const prompt = `
+你是一位專精於${context.businessModel}領域的市場分析專家。
+主題：${context.topic}
+請根據${context.businessModel}模式，生成10個最重要的關鍵字，針對每個關鍵字給出「搜尋量級」(高/中/低)、「類型」(B2B專業、B2C消費、B2B2C平台等)。
+請以 JSON 格式回傳，如：{"keywords":[{"keyword":"xxx","volume":"高","type":"B2B專業"},...]}
+    `;
     return safeJsonParse(await callGeminiAPI(prompt));
 }
 
@@ -355,22 +378,26 @@ async function performGoogleSearch(keywords) {
     if (!keywords || keywords.length === 0) return [];
     const query = keywords.filter(k => k.volume === '高').slice(0, 3).map(k => `"${k.keyword}"`).join(' OR ');
     if (!query) {
-        showAlert('搜尋提示', '未找到高流量關鍵字，將使用核心關鍵字進行搜尋。', 'info');
-        return performGoogleSearch([{ keyword: document.getElementById('core-keyword').value.trim(), volume: '高' }]);
+        showAlert('搜尋提示', '未找到高流量關鍵字，將使用分析主題進行搜尋。', 'info');
+        const context = getSearchContext();
+        return performGoogleSearch([{ keyword: context.topic, volume: '高' }]);
     }
-    const marketInfo = document.getElementById('target-market').value.split('|');
     const response = await gapi.client.request({
         'path': `https://customsearch.googleapis.com/customsearch/v1`,
-        'params': { 'key': state.apiKeys.google, 'cx': state.apiKeys.searchEngineId, 'q': query, 'cr': `country${marketInfo[0].toUpperCase()}` }
+        'params': { 'key': state.apiKeys.google, 'cx': state.apiKeys.searchEngineId, 'q': query }
     });
     return response.result.items || [];
 }
 
 async function getAiCompetitorAnalysis(searchResults) {
-    if (searchResults.length === 0) return { competitors: [] };
-    const context = searchResults.slice(0, 10).map(item => `Title: ${item.title}\nURL: ${item.link}\nSnippet: ${item.snippet}`).join('\n\n');
-    // Prompt 新增股票代號與郵遞區號
-    const prompt = `你是一位市場情報分析師。以下是針對 "${document.getElementById('core-keyword').value}" 的 Google 搜尋結果。請從中分析並識別出 5 個最主要的競爭對手品牌，對每個品牌，請提供：「品牌名稱」、「業務摘要（30字以內）」、「官方網站URL」、「公司類型（例如 SaaS、服務、產品等）」、「LinkedIn 公司頁面URL」、「股票代號（如無則留空）」、「公司所在郵遞區號（如無則留空）」。請以JSON格式回傳，例如：{"competitors":[{"brandName":"...","summary":"...","websiteUrl":"...","companyType":"...","linkedinUrl":"...","stockCode":"...","zipcode":"..."}]}`;
+    const context = getSearchContext();
+    const prompt = `
+你是一位市場情報分析師。主題：${context.topic}
+商業分類：${context.businessModel}
+以下是Google搜尋結果。請根據${context.businessModel}邏輯，識別5個最主要的競爭對手品牌，並提供：
+品牌名稱、業務摘要、官方網站、公司類型、LinkedIn公司頁、股票代號、郵遞區號、以及用Monica API評估該品牌的AI分數（請留空為""，未來將補入）。
+請以JSON格式回傳。
+    `;
     return safeJsonParse(await callGeminiAPI(prompt));
 }
 
@@ -411,8 +438,10 @@ function renderPartialResults(type) {
                 <p class="text-sm text-gray-700">${c.summary || ''}</p>
                 <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 underline">${c.websiteUrl}</a>
                 <div class="mt-1 text-gray-500 text-sm">
+                  公司類型：${c.companyType || '-'}<br/>
                   股號：${c.stockCode || '-'}<br/>
-                  郵遞區號：${c.zipcode || '-'}
+                  郵遞區號：${c.zipcode || '-'}<br/>
+                  Monica分數：${c.monicaApiScore || '-'}
                 </div>
             </div>`
         ).join('');
@@ -425,7 +454,8 @@ function renderPartialResults(type) {
                 <a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 underline">${c.linkedinUrl || ''}</a>
                 <div class="mt-1 text-gray-500 text-sm">
                   股號：${c.stockCode || '-'}<br/>
-                  郵遞區號：${c.zipcode || '-'}
+                  郵遞區號：${c.zipcode || '-'}<br/>
+                  Monica分數：${c.monicaApiScore || '-'}
                 </div>
             </div>`
         ).join('');
@@ -438,8 +468,9 @@ async function saveAnalysisToDrive() {
         showAlert('無法儲存', '請先生成報告並確保已設定 Google Drive 資料夾。', 'warning');
         return;
     }
+    const context = getSearchContext();
     const metadata = {
-        name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`,
+        name: `${context.topic}_${new Date().toISOString()}.json`,
         mimeType: 'application/json',
         parents: [state.driveFolderId]
     };
@@ -527,8 +558,10 @@ function exportToExcel() {
         '品牌名稱': c.brandName,
         '業務摘要': c.summary,
         '網站': c.websiteUrl,
+        '公司類型': c.companyType,
         '股票代號': c.stockCode,
-        '郵遞區號': c.zipcode
+        '郵遞區號': c.zipcode,
+        'Monica分數': c.monicaApiScore
     }));
     const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
     XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_競爭對手網站");
@@ -538,11 +571,13 @@ function exportToExcel() {
         '公司類型': c.companyType,
         'LinkedIn': c.linkedinUrl,
         '股票代號': c.stockCode,
-        '郵遞區號': c.zipcode
+        '郵遞區號': c.zipcode,
+        'Monica分數': c.monicaApiScore
     }));
     const linkedinSheet = XLSX.utils.json_to_sheet(linkedinSheetData);
     XLSX.utils.book_append_sheet(wb, linkedinSheet, "C_LinkedIn分析");
-    XLSX.writeFile(wb, `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`);
+    const context = getSearchContext();
+    XLSX.writeFile(wb, `${context.topic || '分析'}_Analysis.xlsx`);
 }
 
 function showAlert(title, message, type = 'info') {
