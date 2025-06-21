@@ -314,16 +314,16 @@ function checkAuthReady() {
       ui.authorizeButton.classList.remove('hidden');
       ui.userProfile.classList.add('hidden');
       ui.appContainer.classList.add('locked');
-      ui.analysisSection.classList.add('locked'); // 新增這行
+      ui.analysisSection.classList.add('locked'); 
     } else {
       ui.authorizeButton.classList.add('hidden');
       ui.userProfile.classList.remove('hidden');
       ui.appContainer.classList.remove('locked');
-      // 檢查API設定
+      // API 設定完成才解除分析區塊的鎖定
       if (state.isApiReady) {
-        ui.analysisSection.classList.remove('locked');
+        ui.analysisSection.classList.remove('locked'); 
       } else {
-        ui.analysisSection.classList.add('locked');
+        ui.analysisSection.classList.add('locked'); 
       }
     }
   }
