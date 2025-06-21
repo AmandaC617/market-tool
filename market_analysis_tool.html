@@ -283,6 +283,13 @@ function handleSignOutClick() {
   state.userProfile = null;
   checkAuthReady();
 }
+  function handleAuthClick() {
+  if (state.tokenClient) {
+    state.tokenClient.requestAccessToken();
+  } else {
+    alert('Google Token Client 尚未初始化，請稍後再試。');
+  }
+}
 function setupEventListeners() {
   ui.authorizeButton.onclick = handleAuthClick;
   ui.signOutButton.onclick = handleSignOutClick;
