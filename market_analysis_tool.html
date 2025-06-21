@@ -20,7 +20,6 @@
     </style>
 </head>
 <body class="bg-gray-100">
-
     <header class="bg-white shadow-md">
         <div class="container mx-auto px-6 py-4 flex justify-between items-center">
             <h1 class="text-2xl font-bold text-gray-800">市場情資與競品分析平台</h1>
@@ -34,13 +33,10 @@
             </div>
         </div>
     </header>
-    
     <div id="alert-container" class="sticky top-0 z-50 p-4"></div>
-
     <main class="container mx-auto px-6 py-8">
         <div id="app-container" class="locked">
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
                 <div class="lg:col-span-1 space-y-6">
                     <section id="settings-section" class="bg-white p-6 rounded-lg shadow-lg">
                         <h2 class="text-xl font-bold mb-4">API & 應用程式設定</h2>
@@ -72,7 +68,6 @@
                             <button id="save-settings-btn" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">儲存並啟用設定</button>
                         </div>
                     </section>
-                    
                     <section id="analysis-input-section" class="bg-white p-6 rounded-lg shadow-lg locked">
                          <h2 class="text-xl font-bold mb-4">分析目標</h2>
                          <div class="space-y-4">
@@ -101,14 +96,12 @@
                          </div>
                     </section>
                 </div>
-
                 <div class="lg:col-span-2 space-y-6">
                     <div class="bg-white rounded-lg shadow-lg">
                         <div class="flex border-b">
                             <button data-tab="results" class="tab-btn tab active flex-1 p-4 font-semibold">分析結果</button>
                             <button data-tab="history" class="tab-btn tab flex-1 p-4 font-semibold">歷史紀錄</button>
                         </div>
-
                         <div id="results-panel" class="panel active p-6">
                            <div id="results-content" class="min-h-[400px]">
                                 <div id="loading-indicator" class="flex flex-col items-center justify-center h-full">
@@ -131,7 +124,6 @@
                                <button id="export-excel-btn" class="flex-1 bg-gray-700 text-white font-bold py-2 rounded-lg hover:bg-gray-800">匯出為 Excel</button>
                            </div>
                         </div>
-
                         <div id="history-panel" class="panel p-6 min-h-[400px]">
                             <div id="history-list" class="space-y-4">
                                 <p class="text-gray-500">沒有歷史紀錄。</p>
@@ -265,8 +257,6 @@ async function handleSaveSettings() {
     state.isApiReady = true;
     ui.analysisSection.classList.remove('locked');
     showAlert('設定已儲存', 'API 已設定完成並啟用，正在設定 Google Drive 資料夾...', 'success');
-    
-    // Setup Drive folder immediately after saving settings
     await setupGoogleDrive();
     loadAnalysisHistory();
 }
@@ -325,18 +315,27 @@ async function startAnalysisWorkflow() {
         ui.loadingStatus.textContent = '步驟 1/3: 正在生成行業關鍵字...';
         const keywordsResponse = await getAiKeywordAnalysis();
         state.currentResults = { keywords: keywordsResponse.keywords || [] };
+
         renderPartialResults('keywords');
 
         ui.loadingStatus.textContent = '步驟 2/3: 正在搜尋競爭對手...';
         const searchResults = await performGoogleSearch(state.currentResults.keywords);
-        
+
         ui.loadingStatus.textContent = '步驟 3/3: 正在分析競爭對手資訊...';
         const competitorsResponse = await getAiCompetitorAnalysis(searchResults);
-        state.currentResults.competitors = competitorsResponse.competitors || [];
+
+        state.currentResults.competitors = (competitorsResponse.competitors || []).map(c => ({
+            brandName: c.brandName || '',
+            summary: c.summary || '',
+            websiteUrl: c.websiteUrl || '',
+            companyType: c.companyType || '',
+            linkedinUrl: c.linkedinUrl || '',
+            stockCode: c.stockCode || '',
+            zipcode: c.zipcode || ''
+        }));
 
         renderPartialResults('competitors');
         showAlert('分析完成', '所有報告皆已生成完畢。', 'success');
-
     } catch (error) {
         console.error("分析失敗:", error);
         showAlert('分析失敗', `發生錯誤: ${error?.message || '未知錯誤'}`, 'error');
@@ -348,7 +347,7 @@ async function startAnalysisWorkflow() {
 
 async function getAiKeywordAnalysis() {
     const marketInfo = document.getElementById('target-market').value.split('|');
-    const prompt = `你是一位專精於 ${marketInfo[2]} 市場的資深SEO與市場分析專家。請針對以下條件，生成一份詳細的關鍵字分析報告：- 核心主題: "${document.getElementById('core-keyword').value}" - 商業模式: "${document.querySelector('input[name="business-model"]:checked').value}" - 目標語言: "${marketInfo[1]}" 請提供 50 個最相關的關鍵字，盡可能涵蓋短尾、中尾和長尾關鍵字。對於每個關鍵字，請評估其「搜尋量級」（高、中、低）和「關鍵字類型」（例如：品牌字、產品字、比較字、問題字、資訊字）。請嚴格以 JSON 格式返回，不要包含任何 json 標籤或註解，格式如下：{ "keywords": [{ "keyword": "...", "volume": "高", "type": "產品字" }, ...] }`;
+    const prompt = `你是一位專精於 ${marketInfo[2]} 市場的資深SEO與市場分析專家。請針對以下條件，生成一份詳細的關鍵字分析報告：- 核心主題: "${document.getElementById('core-keyword').value}" - 請至少列出10個關鍵字，並針對每個關鍵字給出「搜尋量級」(高/中/低)、「類型」(品牌、產品、通用、趨勢等)。請以 JSON 格式輸出，如：{"keywords":[{"keyword":"xxx","volume":"高","type":"品牌"},...]}`;
     return safeJsonParse(await callGeminiAPI(prompt));
 }
 
@@ -358,7 +357,7 @@ async function performGoogleSearch(keywords) {
     if (!query) {
         showAlert('搜尋提示', '未找到高流量關鍵字，將使用核心關鍵字進行搜尋。', 'info');
         return performGoogleSearch([{ keyword: document.getElementById('core-keyword').value.trim(), volume: '高' }]);
-    };
+    }
     const marketInfo = document.getElementById('target-market').value.split('|');
     const response = await gapi.client.request({
         'path': `https://customsearch.googleapis.com/customsearch/v1`,
@@ -370,7 +369,8 @@ async function performGoogleSearch(keywords) {
 async function getAiCompetitorAnalysis(searchResults) {
     if (searchResults.length === 0) return { competitors: [] };
     const context = searchResults.slice(0, 10).map(item => `Title: ${item.title}\nURL: ${item.link}\nSnippet: ${item.snippet}`).join('\n\n');
-    const prompt = `你是一位市場情報分析師。以下是針對 "${document.getElementById('core-keyword').value}" 的 Google 搜尋結果。請從中分析並識別出 5 個最主要的競爭對手。對於每個競爭對手，完成以下任務：1. 識別其官方品牌名稱和主要網站 URL。2. 根據其網站摘要，用繁體中文總結其核心業務（不超過 30 字）。3. 在 LinkedIn 上尋找其官方公司頁面 URL。如果找不到，請返回 "N/A"。4. 根據其業務性質，將其分類為以下類型之一：[SaaS, 硬體製造, 顧問服務, 零售電商, 代理商, 內容平台]。請嚴格以 JSON 格式返回，不要包含任何 json 標籤或註解，格式如下：{ "competitors": [{ "brandName": "...", "websiteUrl": "...", "summary": "...", "linkedinUrl": "...", "companyType": "SaaS" }, ...] } 搜尋結果上下文:\n${context}`;
+    // Prompt 新增股票代號與郵遞區號
+    const prompt = `你是一位市場情報分析師。以下是針對 "${document.getElementById('core-keyword').value}" 的 Google 搜尋結果。請從中分析並識別出 5 個最主要的競爭對手品牌，對每個品牌，請提供：「品牌名稱」、「業務摘要（30字以內）」、「官方網站URL」、「公司類型（例如 SaaS、服務、產品等）」、「LinkedIn 公司頁面URL」、「股票代號（如無則留空）」、「公司所在郵遞區號（如無則留空）」。請以JSON格式回傳，例如：{"competitors":[{"brandName":"...","summary":"...","websiteUrl":"...","companyType":"...","linkedinUrl":"...","stockCode":"...","zipcode":"..."}]}`;
     return safeJsonParse(await callGeminiAPI(prompt));
 }
 
@@ -403,10 +403,32 @@ function renderPartialResults(type) {
         </table>`;
     }
     if (type === 'competitors') {
+        // 競爭對手網站
         const competitorsPanel = document.getElementById('competitors-result-panel');
-        competitorsPanel.innerHTML = state.currentResults.competitors.map(c => `<div class="p-3 border rounded-lg mb-3"><p class="font-bold text-lg text-indigo-700">${c.brandName}</p><p class="text-sm text-gray-600 mt-1">${c.summary}</p><div class="mt-2 text-sm"><a href="${c.websiteUrl}" target="_blank" class="text-blue-600 hover:underline">官方網站</a></div></div>`).join('') || '<p>無競爭對手資料</p>';
+        competitorsPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
+            `<div class="p-3 border rounded-lg mb-3">
+                <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
+                <p class="text-sm text-gray-700">${c.summary || ''}</p>
+                <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 underline">${c.websiteUrl}</a>
+                <div class="mt-1 text-gray-500 text-sm">
+                  股號：${c.stockCode || '-'}<br/>
+                  郵遞區號：${c.zipcode || '-'}
+                </div>
+            </div>`
+        ).join('');
+        // LinkedIn 分析
         const linkedinPanel = document.getElementById('linkedin-result-panel');
-        linkedinPanel.innerHTML = state.currentResults.competitors.map(c => `<div class="p-3 border rounded-lg mb-3"><p class="font-bold text-lg text-indigo-700">${c.brandName}</p><p class="mt-1 text-sm"><strong>公司類型:</strong> ${c.companyType}</p><div class="mt-2 text-sm">${c.linkedinUrl !== 'N/A' ? `<a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 hover:underline">LinkedIn 公司主頁</a>` : '<span>未找到 LinkedIn</span>'}</div></div>`).join('') || '<p>無競爭對手資料</p>';
+        linkedinPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
+            `<div class="p-3 border rounded-lg mb-3">
+                <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
+                <p class="mt-1 text-gray-700">公司類型：${c.companyType || ''}</p>
+                <a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 underline">${c.linkedinUrl || ''}</a>
+                <div class="mt-1 text-gray-500 text-sm">
+                  股號：${c.stockCode || '-'}<br/>
+                  郵遞區號：${c.zipcode || '-'}
+                </div>
+            </div>`
+        ).join('');
         ui.resultsActions.classList.remove('hidden');
     }
 }
@@ -416,11 +438,23 @@ async function saveAnalysisToDrive() {
         showAlert('無法儲存', '請先生成報告並確保已設定 Google Drive 資料夾。', 'warning');
         return;
     }
-    const metadata = { name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`, mimeType: 'application/json', parents: [state.driveFolderId] };
+    const metadata = {
+        name: `${document.getElementById('core-keyword').value.trim()}_${new Date().toISOString()}.json`,
+        mimeType: 'application/json',
+        parents: [state.driveFolderId]
+    };
     const boundary = 'foo_bar_baz';
-    const multipartRequestBody = `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({ inputs: { keyword: document.getElementById('core-keyword').value.trim(), market: document.getElementById('target-market').value, model: document.querySelector('input[name="business-model"]:checked').value }, results: state.currentResults })}\r\n--${boundary}--`;
+    const multipartRequestBody = 
+        `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+        `--${boundary}\r\nContent-Type: application/json\r\n\r\n${JSON.stringify({results: state.currentResults, queriedAt: new Date().toISOString()})}\r\n--${boundary}--`;
     try {
-        await gapi.client.request({ path: '/upload/drive/v3/files', method: 'POST', params: { uploadType: 'multipart' }, headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' }, body: multipartRequestBody });
+        await gapi.client.request({
+            path: '/upload/drive/v3/files',
+            method: 'POST',
+            params: { uploadType: 'multipart' },
+            headers: { 'Content-Type': 'multipart/related; boundary="' + boundary + '"' },
+            body: multipartRequestBody
+        });
         showAlert('儲存成功', '分析報告已儲存至您的 Google Drive。', 'success');
         loadAnalysisHistory();
     } catch (e) { showAlert('儲存失敗', '無法將報告儲存至 Google Drive。', 'error'); }
@@ -438,7 +472,7 @@ async function loadAnalysisHistory() {
         files.forEach(file => {
             const fileEl = document.createElement('div');
             fileEl.className = 'border p-3 rounded-lg flex justify-between items-center';
-            fileEl.innerHTML = `<div><p class="font-semibold">${file.name.replace('.json', '')}</p><p class="text-sm text-gray-500">儲存於: ${new Date(file.createdTime).toLocaleDateString()}</p></div><div><button data-id="${file.id}" class="load-history-btn text-sm bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">載入</button></div>`;
+            fileEl.innerHTML = `<div><p class="font-semibold">${file.name.replace('.json', '')}</p><p class="text-sm text-gray-500">儲存於: ${new Date(file.createdTime).toLocaleDateString()}</p></div><button class="load-history-btn bg-blue-100 px-3 py-1 rounded text-blue-800 font-semibold" data-id="${file.id}">載入</button>`;
             ui.historyList.appendChild(fileEl);
         });
     } else { ui.historyList.innerHTML = '<p class="text-gray-500">此資料夾中沒有歷史紀錄。</p>'; }
@@ -485,12 +519,27 @@ function handleTabSwitch(e) {
 function exportToExcel() {
     if (!state.currentResults) return;
     const wb = XLSX.utils.book_new();
-    const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords);
+    // 關鍵字
+    const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords || []);
     XLSX.utils.book_append_sheet(wb, keywordsSheet, "A_關鍵字分析");
-    const competitorsSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '業務摘要': c.summary, '網站': c.websiteUrl }));
+    // 競爭對手網站
+    const competitorsSheetData = (state.currentResults.competitors || []).map(c => ({
+        '品牌名稱': c.brandName,
+        '業務摘要': c.summary,
+        '網站': c.websiteUrl,
+        '股票代號': c.stockCode,
+        '郵遞區號': c.zipcode
+    }));
     const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
     XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_競爭對手網站");
-    const linkedinSheetData = state.currentResults.competitors.map(c => ({ '品牌名稱': c.brandName, '公司類型': c.companyType, 'LinkedIn': c.linkedinUrl }));
+    // LinkedIn
+    const linkedinSheetData = (state.currentResults.competitors || []).map(c => ({
+        '品牌名稱': c.brandName,
+        '公司類型': c.companyType,
+        'LinkedIn': c.linkedinUrl,
+        '股票代號': c.stockCode,
+        '郵遞區號': c.zipcode
+    }));
     const linkedinSheet = XLSX.utils.json_to_sheet(linkedinSheetData);
     XLSX.utils.book_append_sheet(wb, linkedinSheet, "C_LinkedIn分析");
     XLSX.writeFile(wb, `${document.getElementById('core-keyword').value.trim()}_Analysis.xlsx`);
@@ -500,7 +549,7 @@ function showAlert(title, message, type = 'info') {
     const colors = { info: 'bg-blue-100 border-blue-500 text-blue-700', success: 'bg-green-100 border-green-500 text-green-700', warning: 'bg-yellow-100 border-yellow-500 text-yellow-700', error: 'bg-red-100 border-red-500 text-red-700' };
     const alertEl = document.createElement('div');
     alertEl.className = `p-4 mb-4 rounded-md shadow-lg border-l-4 ${colors[type]}`;
-    alertEl.innerHTML = `<div class="flex"><div class="ml-3"><p class="font-bold">${title}</p><p class="text-sm">${message}</p></div><button class="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-lg inline-flex h-8 w-8" onclick="this.parentElement.parentElement.remove()">×</button></div>`;
+    alertEl.innerHTML = `<div class="flex"><div class="ml-3"><p class="font-bold">${title}</p><p class="text-sm">${message}</p></div><button class="ml-auto -mx-1.5 -my-1.5 p-1.5 rounded-lg inline-flex items-center justify-center text-${type === 'error' ? 'red' : 'gray'}-500 hover:bg-gray-200" onclick="this.parentElement.parentElement.remove()"><span class="sr-only">關閉</span>✕</button></div>`;
     document.getElementById('alert-container').prepend(alertEl);
     setTimeout(() => alertEl.remove(), 6000);
 }
