@@ -270,6 +270,26 @@ function setupEventListeners() {
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
 }
+  function handleSaveSettings() {
+  state.apiKeys.google = document.getElementById('google-api-key').value.trim();
+  state.apiKeys.searchEngineId = document.getElementById('search-engine-id').value.trim();
+  state.apiKeys.gemini = document.getElementById('ai-gemini-key').value.trim();
+  state.apiKeys.monica = document.getElementById('ai-monica-key').value.trim();
+  state.apiKeys.driveFolderName = document.getElementById('drive-folder-name').value.trim();
+
+  if (
+    state.apiKeys.google ||
+    state.apiKeys.searchEngineId ||
+    state.apiKeys.gemini ||
+    state.apiKeys.monica
+  ) {
+    state.isApiReady = true;
+    showAlert('設定已儲存', 'API設定已更新，可以進行分析。', 'success');
+  } else {
+    state.isApiReady = false;
+    showAlert('設定不完整', '請至少填寫一組API金鑰。', 'warning');
+  }
+}
 // ------ 登入/登出 UI 狀態控制 ------
 function checkAuthReady() {
   if (state.gapiReady && state.gisReady) {
