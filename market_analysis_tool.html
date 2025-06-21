@@ -881,7 +881,125 @@ async function showKeywords(context) {
       `<span style="color:red">AI 關鍵字分析失敗：${e.message}</span>`;
   }
 }
+// --------- AI 關鍵字分析函式區塊 PATCH ---------
+async function getAiKeywordAnalysis_Gemini(context) {
+  const prompt = `
+    根據以下分析條件，列出 30 組高相關性的關鍵字（依相關性由高到低排序），格式為 [{"keyword":"xxx", "volume":"高/中/低", "type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
+    條件：${JSON.stringify(context)}
+  `;
+  const apiKey = state.apiKeys.gemini;
+  if (!apiKey) throw new Error('請先填寫 Gemini API Key');
+  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
+  const body = {
+    contents: [{ parts: [{ text: prompt }] }]
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  let keywords = [];
+  try {
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const match = text.match(/\[.*\]/s);
+    if (match) {
+      keywords = JSON.parse(match[0]).map(obj => ({
+        ...obj,
+        source: 'Gemini'
+      }));
+    }
+  } catch (e) {
+    throw new Error('Gemini 回傳格式解析失敗');
+  }
+  return keywords;
+}
 
+async function getAiKeywordAnalysis_Monica(context) {
+  const prompt = `
+    依據這些條件，列出30個高相關性的關鍵字（依相關性由高到低排序），回傳格式為 [{"keyword":"xxx","volume":"高/中/低","type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
+    條件：${JSON.stringify(context)}
+  `;
+  const apiKey = state.apiKeys.monica;
+  if (!apiKey) throw new Error('請先填寫 Monica API Key');
+  const url = "https://api.monica.im/v1/chat/completions";
+  const body = {
+    model: "monica-16k",
+    messages: [{ role: "user", content: prompt }],
+    stream: false
+  };
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + apiKey
+    },
+    body: JSON.stringify(body)
+  });
+  const data = await res.json();
+  let keywords = [];
+  try {
+    const text = data.choices?.[0]?.message?.content || '';
+    const match = text.match(/\[.*\]/s);
+    if (match) {
+      keywords = JSON.parse(match[0]).map(obj => ({
+        ...obj,
+        source: 'Monica'
+      }));
+    }
+  } catch (e) {
+    throw new Error('Monica 回傳格式解析失敗');
+  }
+  return keywords;
+}
+
+function mergeAndDedupKeywords(arrays) {
+  const map = new Map();
+  arrays.flat().forEach(obj => {
+    const key = obj.keyword.trim();
+    if (!map.has(key)) {
+      map.set(key, obj);
+    } else {
+      const exist = map.get(key);
+      if (exist.source && obj.source && !exist.source.includes(obj.source)) {
+        exist.source += `,${obj.source}`;
+      }
+    }
+  });
+  return Array.from(map.values());
+}
+
+async function getAiKeywordAnalysisBoth(context) {
+  const apis = [];
+  if (state.apiKeys.gemini) apis.push(getAiKeywordAnalysis_Gemini(context));
+  if (state.apiKeys.monica) apis.push(getAiKeywordAnalysis_Monica(context));
+  if (apis.length === 0) throw new Error("請先填寫至少一組 AI API Key");
+  const results = await Promise.all(apis);
+  const allKeywords = mergeAndDedupKeywords(results);
+  return {
+    all: allKeywords,
+    gemini: results[0] || [],
+    monica: results[1] || []
+  };
+}
+
+// ------ 主程式預期的函式名 PATCH ------
+async function getAiKeywordAnalysis() {
+  const context = getSearchContext();
+  const result = await getAiKeywordAnalysisBoth(context);
+  return { keywords: result.all };
+}
+
+// ------ 顯示工具（如需單獨顯示用） ------
+function renderKeywords(keywordList) {
+  if (!keywordList.length) return "<li>無資料</li>";
+  return keywordList.map((obj, idx) =>
+    `<li>${idx + 1}. ${obj.keyword}（熱度：${obj.volume}，類型：${obj.type}，來源：${obj.source}）</li>`
+  ).join('');
+}
+
+// 如果你想測試可加這行：
+// showKeywords(getSearchContext());
 // --------- 用法範例 ---------
 // 頁面需有 <div id="keywords-list"></div>
 // const context = { topic: "AI行銷工具", otherInfo: "B2B產業" };
