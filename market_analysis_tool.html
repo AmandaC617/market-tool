@@ -270,6 +270,23 @@ function setupEventListeners() {
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
 }
+function showAlert(title, message, type = 'info') {
+  const alertContainer = document.getElementById('alert-container');
+  let color = '';
+  switch(type) {
+    case 'success': color = 'bg-green-600'; break;
+    case 'error': color = 'bg-red-600'; break;
+    case 'warning': color = 'bg-yellow-600 text-black'; break;
+    default: color = 'bg-blue-600'; break;
+  }
+  const alertDiv = document.createElement('div');
+  alertDiv.className = `rounded-lg shadow-lg px-5 py-3 mb-2 font-bold ${color}`;
+  alertDiv.innerHTML = `<strong>${title}</strong> <span class="font-normal">${message}</span>`;
+  alertContainer.appendChild(alertDiv);
+  setTimeout(() => {
+    alertDiv.remove();
+  }, 2600);
+}
 function handleSaveSettings() {
   state.apiKeys.google = document.getElementById('google-api-key').value.trim();
   state.apiKeys.searchEngineId = document.getElementById('search-engine-id').value.trim();
