@@ -255,41 +255,6 @@ window.onload = () => {
   document.body.appendChild(gisScript);
   setupEventListeners();
 };
-// ------ 登入/登出 UI 狀態控制 ------
-function checkAuthReady() {
-  if (state.gapiReady && state.gisReady) {
-    if (!state.accessToken) {
-      ui.authorizeButton.classList.remove('hidden');
-      ui.userProfile.classList.add('hidden');
-      ui.appContainer.classList.add('locked');
-    } else {
-      ui.authorizeButton.classList.add('hidden');
-      ui.userProfile.classList.remove('hidden');
-      ui.appContainer.classList.remove('locked');
-    }
-  }
-}
-
-function gisInCallback(response) {
-  if (response && response.access_token) {
-    state.accessToken = response.access_token;
-    checkAuthReady();
-    // 可在這裡加載 user profile 等
-  }
-}
-
-function handleSignOutClick() {
-  state.accessToken = null;
-  state.userProfile = null;
-  checkAuthReady();
-}
-  function handleAuthClick() {
-  if (state.tokenClient) {
-    state.tokenClient.requestAccessToken();
-  } else {
-    alert('Google Token Client 尚未初始化，請稍後再試。');
-  }
-}
 function setupEventListeners() {
   ui.authorizeButton.onclick = handleAuthClick;
   ui.signOutButton.onclick = handleSignOutClick;
@@ -305,7 +270,42 @@ function setupEventListeners() {
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
 }
+// ------ 登入/登出 UI 狀態控制 ------
+function checkAuthReady() {
+  if (state.gapiReady && state.gisReady) {
+    if (!state.accessToken) {
+      ui.authorizeButton.classList.remove('hidden');
+      ui.userProfile.classList.add('hidden');
+      ui.appContainer.classList.add('locked');
+    } else {
+      ui.authorizeButton.classList.add('hidden');
+      ui.userProfile.classList.remove('hidden');
+      ui.appContainer.classList.remove('locked');
+    }
+  }
+}
 
+function handleAuthClick() {
+  if (state.tokenClient) {
+    state.tokenClient.requestAccessToken();
+  } else {
+    alert('Google Token Client 尚未初始化，請稍後再試。');
+  }
+}
+
+function gisInCallback(response) {
+  if (response && response.access_token) {
+    state.accessToken = response.access_token;
+    checkAuthReady();
+    // 這裡可以加載 user profile 等
+  }
+}
+
+function handleSignOutClick() {
+  state.accessToken = null;
+  state.userProfile = null;
+  checkAuthReady();
+}
 // ------ 欄位驗證 ------
 function validateFields() {
   let valid = false;
