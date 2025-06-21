@@ -982,8 +982,6 @@ async function getAiKeywordAnalysisBoth(context) {
     monica: results[1] || []
   };
 }
-
-// ------ 主程式預期的函式名 PATCH ------
 async function getAiKeywordAnalysis() {
   const context = getSearchContext();
   const result = await getAiKeywordAnalysisBoth(context);
