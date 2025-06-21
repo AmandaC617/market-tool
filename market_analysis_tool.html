@@ -54,16 +54,13 @@
                                 <label for="search-engine-id" class="block text-sm font-medium text-gray-700">可程式化搜尋引擎 ID (CX)</label>
                                 <input type="text" id="search-engine-id" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 CX ID">
                             </div>
-                             <div>
-                                <label for="ai-provider" class="block text-sm font-medium text-gray-700">AI 模型提供商</label>
-                                <select id="ai-provider" class="mt-1 w-full p-2 border rounded-md">
-                                    <option value="gemini">Google Gemini</option>
-                                    <option value="monica">Monica API (預留)</option>
-                                </select>
+                            <div>
+                                <label for="ai-gemini-key" class="block text-sm font-medium text-gray-700">Gemini AI API 金鑰</label>
+                                <input type="password" id="ai-gemini-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 Gemini API 金鑰">
                             </div>
                             <div>
-                                <label for="ai-api-key" class="block text-sm font-medium text-gray-700">AI API 金鑰</label>
-                                <input type="password" id="ai-api-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 AI API 金鑰">
+                                <label for="ai-monica-key" class="block text-sm font-medium text-gray-700">Monica AI API 金鑰</label>
+                                <input type="password" id="ai-monica-key" class="mt-1 w-full p-2 border rounded-md" placeholder="請輸入您的 Monica API 金鑰">
                             </div>
                             <button id="save-settings-btn" class="w-full bg-green-600 text-white font-bold py-2 rounded-lg hover:bg-green-700">儲存並啟用設定</button>
                         </div>
@@ -97,6 +94,18 @@
                             </div>
                             <button id="start-analysis-btn" class="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 transition">開始分析</button>
                         </div>
+                    </section>
+                    <!-- 競爭對手勾選清單 -->
+                    <section id="competitor-select-panel" class="bg-white p-6 rounded-lg shadow-lg mb-4 hidden">
+                        <div class="mb-2 font-bold">請勾選要深入分析的競爭對手：</div>
+                        <label class="inline-flex items-center mb-2 mr-6">
+                            <input type="checkbox" id="select-all-competitors" class="mr-2">
+                            <span>全選</span>
+                        </label>
+                        <div id="competitor-checkbox-list" class="mb-2"></div>
+                        <button id="analyze-selected-btn" class="mt-3 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                            進行分析
+                        </button>
                     </section>
                 </div>
                 <div class="lg:col-span-2 space-y-6">
@@ -140,8 +149,9 @@
 <script>
 const state = {
     gapiReady: false, gisReady: false, tokenClient: null, accessToken: null, userProfile: null, driveFolderId: null,
-    apiKeys: { google: null, searchEngineId: null, aiProvider: 'gemini', ai: null, driveFolderName: 'MarketingAnalysisTool_Data' },
-    isApiReady: false, currentResults: null
+    apiKeys: { google: null, searchEngineId: null, gemini: null, monica: null, driveFolderName: 'MarketingAnalysisTool_Data' },
+    isApiReady: false, currentResults: null,
+    initialCompetitorNames: [] // for checkbox
 };
 
 const CONFIG = {
@@ -163,6 +173,10 @@ const ui = {
     resultsContainer: document.getElementById('results-tabs-container'),
     resultsActions: document.getElementById('results-actions'),
     historyList: document.getElementById('history-list'),
+    competitorSelectPanel: document.getElementById('competitor-select-panel'),
+    competitorCheckboxList: document.getElementById('competitor-checkbox-list'),
+    selectAllCompetitors: document.getElementById('select-all-competitors'),
+    analyzeSelectedBtn: document.getElementById('analyze-selected-btn')
 };
 
 window.onload = () => {
@@ -188,11 +202,13 @@ function setupEventListeners() {
     ui.authorizeButton.onclick = handleAuthClick;
     ui.signOutButton.onclick = handleSignOutClick;
     ui.saveSettingsBtn.onclick = handleSaveSettings;
-    ui.startAnalysisBtn.onclick = startAnalysisWorkflow;
+    ui.startAnalysisBtn.onclick = startInitialAnalysis;
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', handleTabSwitch));
     document.getElementById('history-list').addEventListener('click', handleHistoryAction);
     document.getElementById('results-actions').addEventListener('click', handleResultAction);
     document.getElementById('results-tabs-container').addEventListener('click', handleTabSwitch);
+    ui.selectAllCompetitors.addEventListener('change', handleSelectAllCompetitors);
+    ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
 }
 
 function checkAuthReady() {
@@ -248,14 +264,13 @@ async function handleSaveSettings() {
     const driveFolderName = document.getElementById('drive-folder-name').value.trim();
     const googleApiKey = document.getElementById('google-api-key').value.trim();
     const searchEngineId = document.getElementById('search-engine-id').value.trim();
-    const aiProvider = document.getElementById('ai-provider').value;
-    const aiApiKey = document.getElementById('ai-api-key').value.trim();
-    
-    if (!driveFolderName || !googleApiKey || !searchEngineId || !aiApiKey) {
+    const geminiApiKey = document.getElementById('ai-gemini-key').value.trim();
+    const monicaApiKey = document.getElementById('ai-monica-key').value.trim();
+    if (!driveFolderName || !googleApiKey || !searchEngineId || !geminiApiKey || !monicaApiKey) {
         showAlert('資訊不完整', '請填寫所有 API 金鑰與資料夾名稱欄位。', 'warning');
         return;
     }
-    state.apiKeys = { driveFolderName, google: googleApiKey, searchEngineId, aiProvider, ai: aiApiKey };
+    state.apiKeys = { driveFolderName, google: googleApiKey, searchEngineId, gemini: geminiApiKey, monica: monicaApiKey };
     localStorage.setItem('marketingToolApiKeys', btoa(JSON.stringify(state.apiKeys)));
     state.isApiReady = true;
     ui.analysisSection.classList.remove('locked');
@@ -274,8 +289,8 @@ function loadSettingsFromLocalStorage() {
             document.getElementById('drive-folder-name').value = state.apiKeys.driveFolderName || 'MarketingAnalysisTool_Data';
             document.getElementById('google-api-key').value = state.apiKeys.google || '';
             document.getElementById('search-engine-id').value = state.apiKeys.searchEngineId || '';
-            document.getElementById('ai-provider').value = state.apiKeys.aiProvider || 'gemini';
-            document.getElementById('ai-api-key').value = state.apiKeys.ai || '';
+            document.getElementById('ai-gemini-key').value = state.apiKeys.gemini || '';
+            document.getElementById('ai-monica-key').value = state.apiKeys.monica || '';
             ui.analysisSection.classList.remove('locked');
         } catch (e) { console.error("無法解析已儲存的 API 金鑰:", e); }
     }
@@ -318,91 +333,174 @@ function getSearchContext() {
     return { topic: topic.trim(), businessModel, industry, sector, product, company };
 }
 
-async function startAnalysisWorkflow() {
+// ----------- 分析流程: 兩階段，先列出競爭對手名稱，再勾選深入分析 ----------- //
+async function startInitialAnalysis() {
     if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); return; }
     const { industry, sector, product, company } = getSearchContext();
     if (!industry && !sector && !product && !company) { showAlert('需要輸入', '請至少填寫一個分析欄位。', 'warning'); return; }
 
     ui.loadingIndicator.classList.remove('hidden');
     ui.spinner.classList.remove('hidden');
-    ui.loadingStatus.textContent = '準備中...';
+    ui.loadingStatus.textContent = '步驟 1/2: 正在生成關鍵字與初步競爭對手名單...';
     ui.resultsContainer.classList.add('hidden');
-    
+    ui.resultsActions.classList.add('hidden');
+    ui.competitorSelectPanel.classList.add('hidden');
+
     try {
-        ui.loadingStatus.textContent = '步驟 1/3: 正在生成關鍵字...';
+        // 關鍵字
         const keywordsResponse = await getAiKeywordAnalysis();
         state.currentResults = { keywords: keywordsResponse.keywords || [] };
-
         renderPartialResults('keywords');
 
-        ui.loadingStatus.textContent = '步驟 2/3: 正在搜尋競爭對手...';
-        const searchResults = await performGoogleSearch(state.currentResults.keywords);
+        // 產生初步競爭對手名單（兩組AI並行，來源標記）
+        const [geminiNames, monicaNames] = await Promise.all([
+            getAiCompetitorNames_Gemini(),
+            getAiCompetitorNames_Monica()
+        ]);
+        // 合併名稱、標明來源
+        let mergedNames = [];
+        if (geminiNames.length)
+            geminiNames.forEach(n => mergedNames.push({ name: n, source: 'Gemini' }));
+        if (monicaNames.length)
+            monicaNames.forEach(n => {
+                // 不重複的才加
+                if (!mergedNames.find(item => item.name === n))
+                    mergedNames.push({ name: n, source: 'Monica' });
+                else
+                    mergedNames = mergedNames.map(item => (item.name === n && item.source !== '兩者') ? { ...item, source: '兩者' } : item);
+            });
+        // 儲存供勾選
+        state.initialCompetitorNames = mergedNames;
+        showCompetitorSelectPanel(mergedNames);
 
-        ui.loadingStatus.textContent = '步驟 3/3: 正在分析競爭對手資訊...';
-        const competitorsResponse = await getAiCompetitorAnalysis(searchResults);
-
-        state.currentResults.competitors = (competitorsResponse.competitors || []).map(c => ({
-            brandName: c.brandName || '',
-            summary: c.summary || '',
-            websiteUrl: c.websiteUrl || '',
-            companyType: c.companyType || '',
-            linkedinUrl: c.linkedinUrl || '',
-            stockCode: c.stockCode || '',
-            zipcode: c.zipcode || '',
-            monicaApiScore: c.monicaApiScore || ''
-        }));
-
-        renderPartialResults('competitors');
-        showAlert('分析完成', '所有報告皆已生成完畢。', 'success');
+        ui.loadingStatus.textContent = '請在下方勾選競爭對手並按「進行分析」';
+        ui.spinner.classList.add('hidden');
     } catch (error) {
         console.error("分析失敗:", error);
         showAlert('分析失敗', `發生錯誤: ${error?.message || '未知錯誤'}`, 'error');
+        ui.spinner.classList.add('hidden');
+    }
+}
+
+// Gemini只產生競爭對手名稱
+async function getAiCompetitorNames_Gemini() {
+    const context = getSearchContext();
+    const prompt = `
+你是一位${context.businessModel}領域的市場分析專家。
+主題：${context.topic}
+請僅列出5~10個最具代表性的競爭對手品牌名稱（只要名稱，不需其他細節），請以JSON格式回傳：
+{"competitorNames":["品牌1","品牌2",...]}
+    `;
+    const resp = safeJsonParse(await callGeminiAPI(prompt, state.apiKeys.gemini));
+    return resp.competitorNames || [];
+}
+
+// Monica只產生競爭對手名稱
+async function getAiCompetitorNames_Monica() {
+    const context = getSearchContext();
+    const prompt = `
+你是一位${context.businessModel}行業的競爭對手情報分析師。
+主題：${context.topic}
+請列出5~10個主要競爭對手品牌名稱（僅名稱即可），以JSON格式回傳，如：
+{"competitorNames":["品牌A","品牌B",...]}
+    `;
+    const resp = safeJsonParse(await callMonicaAPI(prompt, state.apiKeys.monica));
+    return resp.competitorNames || [];
+}
+
+// 競爭對手勾選清單UI
+function showCompetitorSelectPanel(competitorList) {
+    const panel = ui.competitorSelectPanel;
+    const list = ui.competitorCheckboxList;
+    list.innerHTML = competitorList.map((item, idx) =>
+        `<label class="block mb-1"><input type="checkbox" class="competitor-checkbox mr-2" value="${item.name}" checked> ${item.name} <span class="text-xs text-gray-400">[${item.source}]</span></label>`
+    ).join('');
+    panel.classList.remove('hidden');
+    ui.selectAllCompetitors.checked = true;
+}
+
+// 全選功能
+function handleSelectAllCompetitors(){
+    const all = ui.selectAllCompetitors.checked;
+    document.querySelectorAll('.competitor-checkbox').forEach(cb => cb.checked = all);
+}
+
+// 勾選完成後，進行深入分析
+async function analyzeCheckedCompetitors() {
+    const selected = Array.from(document.querySelectorAll('.competitor-checkbox'))
+        .filter(cb => cb.checked)
+        .map(cb => cb.value);
+    if (!selected.length) {
+        showAlert("未選擇", "請至少勾選一個競爭對手。", "warning");
+        return;
+    }
+    ui.loadingIndicator.classList.remove('hidden');
+    ui.spinner.classList.remove('hidden');
+    ui.loadingStatus.textContent = "步驟 2/2: 正在取得競爭對手細部資料...";
+    ui.resultsContainer.classList.add('hidden');
+    ui.resultsActions.classList.add('hidden');
+    // 兩組AI同時查細節
+    try {
+        const [geminiDetails, monicaDetails] = await Promise.all([
+            getAiCompetitorDetails_Gemini(selected),
+            getAiCompetitorDetails_Monica(selected)
+        ]);
+        // 合併細節，來源標記
+        let allDetails = [];
+        // Gemini部分
+        if (geminiDetails.length) {
+            geminiDetails.forEach(item => allDetails.push({ ...item, aiSource: 'Gemini' }));
+        }
+        // Monica部分
+        if (monicaDetails.length) {
+            monicaDetails.forEach(item => {
+                // 如果已存在同名，來源標為"兩者"
+                let existing = allDetails.find(d => d.brandName === item.brandName);
+                if (existing) {
+                    existing.aiSource = (existing.aiSource === 'Gemini') ? '兩者' : existing.aiSource;
+                    // 若Monica資料更完整可合併
+                    for (const key in item) if (item[key] && !existing[key]) existing[key] = item[key];
+                } else {
+                    allDetails.push({ ...item, aiSource: 'Monica' });
+                }
+            });
+        }
+        state.currentResults.competitors = allDetails;
+        renderPartialResults('competitors');
+        ui.resultsContainer.classList.remove('hidden');
+        ui.resultsActions.classList.remove('hidden');
+        showAlert('分析完成', '競爭對手詳細資料已取得。', 'success');
+    } catch (e) {
+        showAlert('分析失敗', 'AI分析競爭對手細節失敗。', 'error');
     } finally {
         ui.spinner.classList.add('hidden');
-        ui.loadingStatus.textContent = '分析結束。您可以開始下一次分析。';
     }
 }
 
-async function getAiKeywordAnalysis() {
+async function getAiCompetitorDetails_Gemini(competitorNames) {
     const context = getSearchContext();
     const prompt = `
-你是一位專精於${context.businessModel}領域的市場分析專家。
-主題：${context.topic}
-請根據${context.businessModel}模式，生成10個最重要的關鍵字，針對每個關鍵字給出「搜尋量級」(高/中/低)、「類型」(B2B專業、B2C消費、B2B2C平台等)。
-請以 JSON 格式回傳，如：{"keywords":[{"keyword":"xxx","volume":"高","type":"B2B專業"},...]}
+請針對以下競爭對手品牌，列出每個品牌的詳細資料：品牌名稱、業務摘要、官方網站、公司類型、LinkedIn公司頁、股票代號、郵遞區號。
+競爭對手品牌清單：[${competitorNames.join('，')}]
+請以JSON格式回傳，如：
+{"competitors":[{"brandName":"xxx","summary":"...","websiteUrl":"...","companyType":"...","linkedinUrl":"...","stockCode":"...","zipcode":"..."}]}
     `;
-    return safeJsonParse(await callGeminiAPI(prompt));
+    const resp = safeJsonParse(await callGeminiAPI(prompt, state.apiKeys.gemini));
+    return resp.competitors || [];
 }
-
-async function performGoogleSearch(keywords) {
-    if (!keywords || keywords.length === 0) return [];
-    const query = keywords.filter(k => k.volume === '高').slice(0, 3).map(k => `"${k.keyword}"`).join(' OR ');
-    if (!query) {
-        showAlert('搜尋提示', '未找到高流量關鍵字，將使用分析主題進行搜尋。', 'info');
-        const context = getSearchContext();
-        return performGoogleSearch([{ keyword: context.topic, volume: '高' }]);
-    }
-    const response = await gapi.client.request({
-        'path': `https://customsearch.googleapis.com/customsearch/v1`,
-        'params': { 'key': state.apiKeys.google, 'cx': state.apiKeys.searchEngineId, 'q': query }
-    });
-    return response.result.items || [];
-}
-
-async function getAiCompetitorAnalysis(searchResults) {
+async function getAiCompetitorDetails_Monica(competitorNames) {
     const context = getSearchContext();
     const prompt = `
-你是一位市場情報分析師。主題：${context.topic}
-商業分類：${context.businessModel}
-以下是Google搜尋結果。請根據${context.businessModel}邏輯，識別5個最主要的競爭對手品牌，並提供：
-品牌名稱、業務摘要、官方網站、公司類型、LinkedIn公司頁、股票代號、郵遞區號、以及用Monica API評估該品牌的AI分數（請留空為""，未來將補入）。
-請以JSON格式回傳。
+請根據主題：${context.topic}，針對競爭對手品牌（${competitorNames.join("，")}），產生每個品牌的詳細資料，包括品牌名稱、業務摘要、網站、公司類型、LinkedIn頁、股票代號、郵遞區號。請以JSON格式回傳：
+{"competitors":[{"brandName":"...","summary":"...","websiteUrl":"...","companyType":"...","linkedinUrl":"...","stockCode":"...","zipcode":"..."}]}
     `;
-    return safeJsonParse(await callGeminiAPI(prompt));
+    const resp = safeJsonParse(await callMonicaAPI(prompt, state.apiKeys.monica));
+    return resp.competitors || [];
 }
 
-async function callGeminiAPI(prompt) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${state.apiKeys.ai}`;
+// Gemini API
+async function callGeminiAPI(prompt, apiKey) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
     const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -419,11 +517,65 @@ async function callGeminiAPI(prompt) {
     return data.candidates[0].content.parts[0].text;
 }
 
+// Monica API
+async function callMonicaAPI(prompt, apiKey) {
+    // 假設Monica API格式
+    const url = `https://api.monica.im/api/v1/chat/completions`;
+    const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
+        body: JSON.stringify({ model: "monica-3.5", messages: [{ role: "user", content: prompt }] })
+    });
+    if (!response.ok) {
+        const errorBody = await response.json();
+        throw new Error(`Monica API Error: ${errorBody?.error?.message || '未知錯誤'}`);
+    }
+    const data = await response.json();
+    // 假設Monica API回傳choices[0].message.content
+    if (!data.choices || !data.choices[0].message.content) {
+        throw new Error("Monica API 回應格式無效。");
+    }
+    return data.choices[0].message.content;
+}
+
+// 關鍵字分析
+async function getAiKeywordAnalysis() {
+    const context = getSearchContext();
+    const prompt = `
+你是一位專精於${context.businessModel}領域的市場分析專家。
+主題：${context.topic}
+請根據${context.businessModel}模式，生成10個最重要的關鍵字，針對每個關鍵字給出「搜尋量級」(高/中/低)、「類型」(B2B專業、B2C消費、B2B2C平台等)。
+請以 JSON 格式回傳，如：{"keywords":[{"keyword":"xxx","volume":"高","type":"B2B專業"},...]}
+    `;
+    return safeJsonParse(await callGeminiAPI(prompt, state.apiKeys.gemini));
+}
+
+// Google Search for competitor websites (可擴充)
+async function performGoogleSearch(keywords) {
+    if (!keywords || keywords.length === 0) return [];
+    const query = keywords.filter(k => k.volume === '高').slice(0, 3).map(k => `"${k.keyword}"`).join(' OR ');
+    if (!query) {
+        showAlert('搜尋提示', '未找到高流量關鍵字，將使用分析主題進行搜尋。', 'info');
+        const context = getSearchContext();
+        return performGoogleSearch([{ keyword: context.topic, volume: '高' }]);
+    }
+    const response = await gapi.client.request({
+        'path': `https://customsearch.googleapis.com/customsearch/v1`,
+        'params': { 'key': state.apiKeys.google, 'cx': state.apiKeys.searchEngineId, 'q': query }
+    });
+    return response.result.items || [];
+}
+
+// ----------- 渲染 ----------- //
 function renderPartialResults(type) {
     ui.resultsContainer.classList.remove('hidden');
     ui.loadingIndicator.classList.add('hidden');
     if (type === 'keywords') {
         const panel = document.getElementById('keywords-result-panel');
+        if (!state.currentResults.keywords || !state.currentResults.keywords.length) {
+            panel.innerHTML = '<div class="text-gray-500">查無關鍵字資料。</div>';
+            return;
+        }
         panel.innerHTML = `<table class="w-full text-left text-sm">
             <thead class="bg-gray-50"><tr class="border-b"><th class="py-2 px-2">關鍵字</th><th>搜尋量級</th><th>類型</th></tr></thead>
             <tbody>${state.currentResults.keywords.map(k => `<tr class="border-b"><td class="py-2 px-2">${k.keyword}</td><td>${k.volume}</td><td>${k.type}</td></tr>`).join('')}</tbody>
@@ -432,34 +584,45 @@ function renderPartialResults(type) {
     if (type === 'competitors') {
         // 競爭對手網站
         const competitorsPanel = document.getElementById('competitors-result-panel');
-        competitorsPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
-            `<div class="p-3 border rounded-lg mb-3">
-                <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
-                <p class="text-sm text-gray-700">${c.summary || ''}</p>
-                <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 underline">${c.websiteUrl}</a>
-                <div class="mt-1 text-gray-500 text-sm">
-                  公司類型：${c.companyType || '-'}<br/>
-                  股號：${c.stockCode || '-'}<br/>
-                  郵遞區號：${c.zipcode || '-'}<br/>
-                  Monica分數：${c.monicaApiScore || '-'}
-                </div>
-            </div>`
-        ).join('');
+        if (!state.currentResults.competitors || !state.currentResults.competitors.length) {
+            competitorsPanel.innerHTML = '<div class="text-gray-500">查無競爭對手資料。</div>';
+        } else {
+            competitorsPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
+                `<div class="p-3 border rounded-lg mb-3">
+                    <div class="flex gap-2 items-center">
+                        <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
+                        <span class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-600">${c.aiSource || ''}</span>
+                    </div>
+                    <p class="text-sm text-gray-700">${c.summary || ''}</p>
+                    <a href="${c.websiteUrl}" target="_blank" class="text-blue-600 underline">${c.websiteUrl}</a>
+                    <div class="mt-1 text-gray-500 text-sm">
+                      公司類型：${c.companyType || '-'}<br/>
+                      股號：${c.stockCode || '-'}<br/>
+                      郵遞區號：${c.zipcode || '-'}
+                    </div>
+                </div>`
+            ).join('');
+        }
         // LinkedIn 分析
         const linkedinPanel = document.getElementById('linkedin-result-panel');
-        linkedinPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
-            `<div class="p-3 border rounded-lg mb-3">
-                <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
-                <p class="mt-1 text-gray-700">公司類型：${c.companyType || ''}</p>
-                <a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 underline">${c.linkedinUrl || ''}</a>
-                <div class="mt-1 text-gray-500 text-sm">
-                  股號：${c.stockCode || '-'}<br/>
-                  郵遞區號：${c.zipcode || '-'}<br/>
-                  Monica分數：${c.monicaApiScore || '-'}
-                </div>
-            </div>`
-        ).join('');
-        ui.resultsActions.classList.remove('hidden');
+        if (!state.currentResults.competitors || !state.currentResults.competitors.length) {
+            linkedinPanel.innerHTML = '<div class="text-gray-500">查無LinkedIn資料。</div>';
+        } else {
+            linkedinPanel.innerHTML = (state.currentResults.competitors || []).map(c =>
+                `<div class="p-3 border rounded-lg mb-3">
+                    <div class="flex gap-2 items-center">
+                        <p class="font-bold text-lg text-indigo-700">${c.brandName}</p>
+                        <span class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-600">${c.aiSource || ''}</span>
+                    </div>
+                    <p class="mt-1 text-gray-700">公司類型：${c.companyType || ''}</p>
+                    <a href="${c.linkedinUrl}" target="_blank" class="text-blue-600 underline">${c.linkedinUrl || ''}</a>
+                    <div class="mt-1 text-gray-500 text-sm">
+                      股號：${c.stockCode || '-'}<br/>
+                      郵遞區號：${c.zipcode || '-'}
+                    </div>
+                </div>`
+            ).join('');
+        }
     }
 }
 
@@ -548,7 +711,10 @@ function handleTabSwitch(e) {
 }
 
 function exportToExcel() {
-    if (!state.currentResults) return;
+    if (!state.currentResults || !state.currentResults.keywords) {
+        showAlert("無法匯出", "目前尚未有完整分析結果。請先完成分析。", "warning");
+        return;
+    }
     const wb = XLSX.utils.book_new();
     // 關鍵字
     const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords || []);
@@ -561,7 +727,7 @@ function exportToExcel() {
         '公司類型': c.companyType,
         '股票代號': c.stockCode,
         '郵遞區號': c.zipcode,
-        'Monica分數': c.monicaApiScore
+        'AI來源': c.aiSource
     }));
     const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
     XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_競爭對手網站");
@@ -572,7 +738,7 @@ function exportToExcel() {
         'LinkedIn': c.linkedinUrl,
         '股票代號': c.stockCode,
         '郵遞區號': c.zipcode,
-        'Monica分數': c.monicaApiScore
+        'AI來源': c.aiSource
     }));
     const linkedinSheet = XLSX.utils.json_to_sheet(linkedinSheetData);
     XLSX.utils.book_append_sheet(wb, linkedinSheet, "C_LinkedIn分析");
@@ -592,7 +758,11 @@ function showAlert(title, message, type = 'info') {
 function safeJsonParse(str) {
     try {
         const cleanStr = str.replace(/```json/g, '').replace(/```/g, '').trim();
-        return JSON.parse(cleanStr);
+        const obj = JSON.parse(cleanStr);
+        if (!obj.keywords || !Array.isArray(obj.keywords)) obj.keywords = [];
+        if (!obj.competitors || !Array.isArray(obj.competitors)) obj.competitors = [];
+        if (!obj.competitorNames || !Array.isArray(obj.competitorNames)) obj.competitorNames = [];
+        return obj;
     } catch (e) {
         console.error("JSON 解析失敗:", str);
         throw new Error("AI 回應的資料格式錯誤，無法解析。");
