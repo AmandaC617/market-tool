@@ -87,10 +87,18 @@
               </div>
               <button id="save-settings-btn" class="w-full bg-gradient-to-tr from-techprimary to-techaccent hover:from-techsecondary hover:to-techaccent font-bold text-white px-5 py-2 rounded-lg shadow-lg tracking-wide transition-all duration-200">儲存並啟用設定</button>
             </div>
+            <div>
+  <label for="topic" class="block text-sm font-medium text-techaccent">分析主題</label>
+  <input type="text" id="topic" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent" placeholder="請輸入分析主題（選填）">
+</div>
           </section>
           <section id="analysis-input-section" class="bg-techpanel rounded-xl shadow-2xl border border-techprimary/20 p-6 locked">
             <h2 class="text-xl font-bold mb-4 text-techaccent">分析目標</h2>
             <div class="space-y-4">
+             <div>
+  <label for="topic" class="block text-sm font-medium text-techaccent">分析主題</label>
+  <input type="text" id="topic" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent" placeholder="請輸入分析主題（選填）">
+</div>
               <div>
                 <label for="country" class="block text-sm font-medium text-techaccent">國家/地區</label>
                 <select id="country" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent">
@@ -373,6 +381,7 @@ async function setupGoogleDrive() {
 // ------ 取得查詢參數 ------
 function getSearchContext() {
   return {
+    topic: document.getElementById('topic')?.value.trim() || '',
     country: document.getElementById('country').value,
     language: document.getElementById('language').value,
     industry: document.getElementById('industry').value.trim(),
