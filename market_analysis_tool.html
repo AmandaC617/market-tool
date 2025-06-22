@@ -286,10 +286,13 @@ function getMonicaHeaders(apiKey) {
     "Content-Type": "application/json"
   };
 }
-
-// 再來是 setupEventListeners()
-function setupEventListeners() {
-  // ...
+function handleResultAction(event) {
+  const target = event.target;
+  if (target.id === 'save-analysis-btn') {
+    saveAnalysisToDrive();
+  } else if (target.id === 'export-excel-btn') {
+    exportToExcel();
+  }
 }
 function setupEventListeners() {
   ui.authorizeButton.onclick = handleAuthClick;
@@ -306,9 +309,6 @@ function setupEventListeners() {
   });
   ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
   ui.saveAnalysisBtn.onclick = saveAnalysisToDrive;
-}
-function handleHistoryAction(event) {
-  // 你可以根據需求補功能，暫時空白也可以
 }
 function handleTabSwitch(event) {
   // 這是一個簡單範例，確保不會再報錯
