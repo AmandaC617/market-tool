@@ -216,9 +216,22 @@
 <script>
 // ------ 狀態管理與 UI 元件 ------
 const state = {
-  gapiReady: false, gisReady: false, tokenClient: null, accessToken: null, userProfile: null, driveFolderId: null,
-  apiKeys: { google: null, searchEngineId: null, gemini: null, monica: null, driveFolderName: 'MarketingAnalysisTool_Data' },
-  isApiReady: false, currentResults: null, initialCompetitorNames: []
+  gapiReady: false,
+  gisReady: false,
+  tokenClient: null,
+  accessToken: null,
+  userProfile: null,
+  driveFolderId: null,
+  apiKeys: {
+    google: null,
+    searchEngineId: null,
+    gemini: '', // 初始值可為 '' 或 null，依你需求
+    monica: '', // 初始值可為 '' 或 null
+    driveFolderName: 'MarketingAnalysisTool_Data'
+  },
+  isApiReady: false,
+  currentResults: null,
+  initialCompetitorNames: []
 };
 const ui = {
   authorizeButton: document.getElementById('authorize_button'),
@@ -745,14 +758,6 @@ async function saveAnalysisToDrive() {
     showAlert('存檔失敗', (await response.json()).error?.message || '發生未知錯誤', 'error');
   }
 }
-// --------- 狀態管理 ---------
-const state = {
-  apiKeys: {
-    gemini: '', // 請填入你的 Gemini API Key
-    monica: ''  // 請填入你的 Monica API Key
-  }
-};
-
 // --------- Gemini 串接 ---------
 async function getAiKeywordAnalysis_Gemini(context) {
   const prompt = `
