@@ -940,7 +940,7 @@ async function getAiKeywordAnalysis_Monica(context) {
   `;
   const apiKey = state.apiKeys.monica;
   if (!apiKey) throw new Error('請先填寫 Monica API Key');
-  const url = "https://api.monica.im/v1/chat/completions";
+  const url = "https://openapi.monica.im/v1/chat/completions";
   const body = {
     model: "monica-16k",
     messages: [{ role: "user", content: prompt }],
