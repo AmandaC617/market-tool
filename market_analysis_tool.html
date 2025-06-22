@@ -270,6 +270,19 @@ window.onload = () => {
   document.body.appendChild(gisScript);
   setupEventListeners();
 };
+function handleResultAction(event) {
+  const target = event.target;
+  if (target.id === 'save-analysis-btn') {
+    saveAnalysisToDrive();
+  } else if (target.id === 'export-excel-btn') {
+    exportToExcel();
+  }
+}
+
+// 再來是 setupEventListeners()
+function setupEventListeners() {
+  // ...
+}
 function setupEventListeners() {
   ui.authorizeButton.onclick = handleAuthClick;
   ui.signOutButton.onclick = handleSignOutClick;
