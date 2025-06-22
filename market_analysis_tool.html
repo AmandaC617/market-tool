@@ -278,6 +278,14 @@ function handleResultAction(event) {
     exportToExcel();
   }
 }
+// --------- Monica API 統一端點與 header ---------
+const API_BASE_URL = "https://openapi.monica.im/v1";
+function getMonicaHeaders(apiKey) {
+  return {
+    "Authorization": `Bearer ${apiKey}`,
+    "Content-Type": "application/json"
+  };
+}
 
 // 再來是 setupEventListeners()
 function setupEventListeners() {
@@ -813,7 +821,8 @@ async function getAiKeywordAnalysis_Monica(context) {
   `;
   const apiKey = state.apiKeys.monica;
   if (!apiKey) throw new Error('請先填寫 Monica API Key');
-  const url = "https://api.monica.im/v1/chat/completions";
+  // 用 API_BASE_URL
+  const url = `${API_BASE_URL}/chat/completions`;
   const body = {
     model: "monica-16k",
     messages: [{ role: "user", content: prompt }],
@@ -821,10 +830,7 @@ async function getAiKeywordAnalysis_Monica(context) {
   };
   const res = await fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + apiKey
-    },
+    headers: getMonicaHeaders(apiKey),  // 用統一 header
     body: JSON.stringify(body)
   });
   const data = await res.json();
