@@ -216,22 +216,22 @@
 <script>
 // ------ 狀態管理與 UI 元件 ------
 const state = {
-  gapiReady: false,
-  gisReady: false,
-  tokenClient: null,
-  accessToken: null,
-  userProfile: null,
-  driveFolderId: null,
+  gapiReady: false,           // Google API 是否載入
+  gisReady: false,            // Google Identity Service 是否載入
+  tokenClient: null,          // Google OAuth2 Token Client 實例
+  accessToken: null,          // Google 登入 access token
+  userProfile: null,          // 用戶個人資料（若有取得）
+  driveFolderId: null,        // Google Drive 資料夾 ID
   apiKeys: {
-    google: null,
-    searchEngineId: null,
-    gemini: '', // 初始值可為 '' 或 null，依你需求
-    monica: '', // 初始值可為 '' 或 null
-    driveFolderName: 'MarketingAnalysisTool_Data'
+    google: null,             // Google API 金鑰
+    searchEngineId: null,     // Google Search Engine ID (CX)
+    gemini: '',               // Gemini AI API 金鑰
+    monica: '',               // Monica AI API 金鑰
+    driveFolderName: 'MarketingAnalysisTool_Data' // 預設資料夾名稱
   },
-  isApiReady: false,
-  currentResults: null,
-  initialCompetitorNames: []
+  isApiReady: false,          // API 設定是否完成
+  currentResults: null,       // 當前分析結果
+  initialCompetitorNames: []  // 初始競爭對手清單
 };
 const ui = {
   authorizeButton: document.getElementById('authorize_button'),
