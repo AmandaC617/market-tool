@@ -1291,10 +1291,12 @@
                 if (doc.exists()) {
                     const projectData = { id: doc.id, ...doc.data() };
                     // 修復權限檢查：超級管理員或專案擁有者都可以編輯
-                    const canEdit = isSuperAdmin(currentUser) || projectData.ownerId === currentUser?.uid;
+                    const canEdit = isSuperAdmin(currentUser) || projectData.ownerId === currentUser?.uid || projectData.members?.includes(currentUser?.uid);
                     console.log('專案詳情載入成功:', projectData.name, '可編輯:', canEdit);
                     console.log('專案擁有者:', projectData.ownerId, '當前使用者:', currentUser?.uid);
                     console.log('是否為超級管理員:', isSuperAdmin(currentUser));
+                    console.log('專案成員:', projectData.members);
+                    console.log('當前使用者是否為成員:', projectData.members?.includes(currentUser?.uid));
                     renderProjectDetail(projectData, canEdit);
                     lastKnownProjectState[projectId] = projectData; 
                     
@@ -1593,23 +1595,34 @@
             detailView.querySelectorAll('.toggle-step-btn').forEach(btn => {
                 console.log('綁定切換步驟狀態按鈕:', btn.dataset.step);
                 btn.addEventListener('click', async () => {
+                    console.log('點擊完成按鈕，權限檢查:', canEdit);
+                    console.log('當前使用者:', currentUser);
+                    console.log('是否為超級管理員:', isSuperAdmin(currentUser));
+                    
                     if (!canEdit) {
                         alert('您沒有權限執行此操作');
                         return;
                     }
                     const stepNum = parseInt(btn.dataset.step);
+                    console.log('開始切換步驟狀態:', stepNum);
                     toggleButtonLoading(btn, true, btn.textContent);
                     try {
                         const projectRef = doc(db, "projects", projectId);
                         const projectSnap = await getDoc(projectRef);
                         const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
-                        await updateDoc(projectRef, {
+                        console.log('當前步驟狀態:', isComplete ? '已完成' : '未完成');
+                        
+                        const updateData = {
                             completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
                             [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
-                        });
+                        };
+                        console.log('更新資料:', updateData);
+                        
+                        await updateDoc(projectRef, updateData);
                         console.log('步驟狀態切換成功:', stepNum, isComplete ? '標記為未完成' : '標記為完成');
                     } catch (error) {
                         console.error('切換步驟狀態失敗:', error);
+                        console.error('錯誤詳情:', error.code, error.message);
                         alert('切換步驟狀態失敗: ' + error.message);
                     } finally {
                         toggleButtonLoading(btn, false, btn.textContent);
