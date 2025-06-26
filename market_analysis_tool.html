@@ -10,12 +10,12 @@
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0f4f8; }
         .step-item, .project-card { transition: all 0.3s ease; }
         .project-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
-        .step-complete { background-color: #d1fae5; border-color: #10b981; }
+        .step-complete { background-color: #dcfce7; border-color: #22c55e; }
         .step-pending { background-color: #ffffff; border-color: #d1d5db; }
         .progress-bar { transition: width 0.5s ease; }
-        .comment-item { border-left: 3px solid #60a5fa; }
-        .log-item { border-left: 3px solid #a5b4fc; }
-        .script-approved { background-color: #f1f5f9; }
+        .comment-item { border-left: 3px solid #93c5fd; }
+        .log-item { border-left: 3px solid #a78bfa; }
+        .script-approved { background-color: #f8fafc; border-left: 4px solid #22c55e; }
         .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1.5s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .skeleton-card { background-color: #ffffff; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
@@ -74,7 +74,17 @@
                     <div><label class="block text-gray-700 mb-2" for="market-input">市場*</label><input type="text" id="market-input" class="w-full px-4 py-2 border rounded-md" placeholder="例如: TW, US, JP" required></div>
                     <div><label class="block text-gray-700 mb-2" for="proposal-time-input">提案時間*</label><input type="date" id="proposal-time-input" class="w-full px-4 py-2 border rounded-md" required></div>
                 </div>
-                <!-- *** MODIFIED: Split dashboard links into two fields *** -->
+                <!-- *** NEW: Added status and dates *** -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                     <div><label class="block text-gray-700 mb-2" for="status-input">專案狀態</label>
+                        <select id="status-input" class="w-full px-4 py-2 border rounded-md bg-white">
+                            <option value="active">進行中</option>
+                            <option value="closed">已結案</option>
+                        </select>
+                    </div>
+                    <div><label class="block text-gray-700 mb-2" for="launch-date-input">實際上線日</label><input type="date" id="launch-date-input" class="w-full px-4 py-2 border rounded-md"></div>
+                    <div><label class="block text-gray-700 mb-2" for="close-date-input">結案日</label><input type="date" id="close-date-input" class="w-full px-4 py-2 border rounded-md"></div>
+                </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div><label class="block text-gray-700 mb-2" for="dashboard-internal-link-input">內部用 Dashboard 連結</label><input type="url" id="dashboard-internal-link-input" class="w-full px-4 py-2 border rounded-md" placeholder="https://lookerstudio.google.com/internal..."></div>
                     <div><label class="block text-gray-700 mb-2" for="dashboard-client-link-input">客戶版 Dashboard 連結</label><input type="url" id="dashboard-client-link-input" class="w-full px-4 py-2 border rounded-md" placeholder="https://lookerstudio.google.com/client..."></div>
@@ -114,7 +124,7 @@
         let currentUser = null;
         let unsubscribeProjects = null;
         let unsubscribeProjectDetail = null;
-        let unsubscribeComments = {}; // *** MODIFIED: Object to hold multiple comment listeners ***
+        let unsubscribeComments = {};
         const TOTAL_STEPS = 6;
 
         // --- UI Elements ---
@@ -123,7 +133,7 @@
             loginModal: document.getElementById('login-modal'),
             googleLoginBtn: document.getElementById('google-login-btn'),
             app: document.getElementById('app'),
-            adminBadge: document.getElementById('admin-badge'), // *** NEW ***
+            adminBadge: document.getElementById('admin-badge'),
             userName: document.getElementById('user-name'),
             userAvatar: document.getElementById('user-avatar'),
             logoutBtn: document.getElementById('logout-button'),
@@ -141,8 +151,11 @@
             clientNameInput: document.getElementById('client-name-input'),
             marketInput: document.getElementById('market-input'),
             proposalTimeInput: document.getElementById('proposal-time-input'),
-            dashboardInternalLinkInput: document.getElementById('dashboard-internal-link-input'), // *** NEW ***
-            dashboardClientLinkInput: document.getElementById('dashboard-client-link-input'), // *** NEW ***
+            statusInput: document.getElementById('status-input'), // *** NEW ***
+            launchDateInput: document.getElementById('launch-date-input'), // *** NEW ***
+            closeDateInput: document.getElementById('close-date-input'), // *** NEW ***
+            dashboardInternalLinkInput: document.getElementById('dashboard-internal-link-input'),
+            dashboardClientLinkInput: document.getElementById('dashboard-client-link-input'),
             closeModalBtns: document.querySelectorAll('.close-modal-btn'),
             deleteConfirmModal: document.getElementById('delete-confirm-modal'),
             cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
@@ -151,8 +164,9 @@
 
         // --- Helper Functions ---
         const isSuperAdmin = (user) => user?.email === SUPER_ADMIN_EMAIL;
-        const toLocaleString = (date) => date ? new Date(date).toLocaleString('zh-TW') : 'N/A';
-        const toLocaleDateString = (date) => date ? new Date(date).toLocaleDateString('zh-TW') : 'N/A';
+        const toLocaleString = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('zh-TW', { hour12: false }) : 'N/A';
+        const toLocaleDateString = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('zh-TW') : 'N/A';
+        const escapeHTML = (str) => str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match]));
 
         // --- AUTHENTICATION ---
         onAuthStateChanged(auth, user => {
@@ -177,13 +191,10 @@
             UI.app.classList.remove('hidden');
             UI.userName.textContent = currentUser.name;
             UI.userAvatar.src = currentUser.avatar;
-            if (isSuperAdmin(currentUser)) {
-                UI.adminBadge.classList.remove('hidden');
-            }
+            UI.adminBadge.classList.toggle('hidden', !isSuperAdmin(currentUser));
             listenForProjects();
         }
 
-        // *** MODIFIED: Handle new dashboard link fields ***
         function handleProjectFormSubmit(e) {
             e.preventDefault();
             const id = UI.projectIdInput.value;
@@ -192,7 +203,10 @@
                 client: UI.clientNameInput.value.trim(),
                 market: UI.marketInput.value.trim(),
                 proposalTime: UI.proposalTimeInput.value,
-                dashboardLinks: { // *** NEW: Stored as a map ***
+                status: UI.statusInput.value,
+                launchDate: UI.launchDateInput.value,
+                closeDate: UI.closeDateInput.value,
+                dashboardLinks: { 
                     internal: UI.dashboardInternalLinkInput.value.trim(),
                     client: UI.dashboardClientLinkInput.value.trim()
                 },
@@ -202,7 +216,6 @@
             if (id) {
                 updateDoc(doc(db, "projects", id), projectData).then(() => UI.projectModal.classList.add('hidden'));
             } else {
-                // *** NEW: Initialize all new log-based fields as empty objects/arrays ***
                 Object.assign(projectData, {
                     ownerId: currentUser.uid,
                     members: [currentUser.uid],
@@ -213,9 +226,9 @@
                     aiFiles: { file1: [], file2: [] },
                     mediaProposals: [],
                     brandCreative: { redirectLink: '', scripts: [
-                        { id: 1, text: '', status: 'pending', approvedBy: null },
-                        { id: 2, text: '', status: 'pending', approvedBy: null },
-                        { id: 3, text: '', status: 'pending', approvedBy: null }
+                        { id: 1, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                        { id: 2, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                        { id: 3, text: '', status: 'pending', approvedBy: null, approvalDate: null }
                     ]},
                     creativeFolder: []
                 });
@@ -232,6 +245,9 @@
                 UI.clientNameInput.value = project.client;
                 UI.marketInput.value = project.market;
                 UI.proposalTimeInput.value = project.proposalTime;
+                UI.statusInput.value = project.status || 'active';
+                UI.launchDateInput.value = project.launchDate || '';
+                UI.closeDateInput.value = project.closeDate || '';
                 UI.dashboardInternalLinkInput.value = project.dashboardLinks?.internal || '';
                 UI.dashboardClientLinkInput.value = project.dashboardLinks?.client || '';
             } else {
@@ -241,7 +257,6 @@
             UI.projectModal.classList.remove('hidden');
         }
 
-        // *** NEW: Add file/link with log ***
         async function addFileLog(projectId, field, link) {
             if (!link.trim()) return;
             const logEntry = {
@@ -249,61 +264,53 @@
                 user: currentUser.email,
                 date: new Date().toISOString()
             };
-            await updateDoc(doc(db, "projects", projectId), {
-                [field]: arrayUnion(logEntry)
-            });
+            await updateDoc(doc(db, "projects", projectId), { [field]: arrayUnion(logEntry) });
         }
         
-        // *** NEW: Add a comment to a specific script ***
         async function addScriptComment(projectId, scriptId, text) {
              if (!text.trim()) return;
-             const commentData = {
-                text,
-                scriptId,
-                authorName: currentUser.name,
-                authorEmail: currentUser.email,
-                createdAt: serverTimestamp()
-             };
+             const commentData = { text, scriptId, authorName: currentUser.name, authorEmail: currentUser.email, createdAt: serverTimestamp() };
              await addDoc(collection(db, "projects", projectId, "scriptComments"), commentData);
         }
 
-        // *** NEW: Approve a script, locking its content ***
         async function approveScript(projectId, scriptId) {
             const projectRef = doc(db, "projects", projectId);
             const projectSnap = await getDoc(projectRef);
             if (!projectSnap.exists()) return;
 
-            const project = projectSnap.data();
-            const scripts = project.brandCreative.scripts;
+            const scripts = projectSnap.data().brandCreative.scripts;
             const scriptIndex = scripts.findIndex(s => s.id === scriptId);
 
             if (scriptIndex !== -1) {
                 scripts[scriptIndex].status = 'approved';
                 scripts[scriptIndex].approvedBy = currentUser.email;
                 scripts[scriptIndex].approvalDate = new Date().toISOString();
-                
                 await updateDoc(projectRef, { "brandCreative.scripts": scripts });
             }
         }
         
-        // --- RENDERING LOGIC (Heavily modified) ---
-
+        // --- RENDERING LOGIC ---
         function renderProjectsList(projects) {
             UI.projectsContainer.innerHTML = '';
             if (projects.length === 0) {
-                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案</p>`;
-                return;
+                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案</p>`; return;
             }
             projects.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
             projects.forEach(project => {
                 const card = document.createElement('div');
                 card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
                 const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
-                const folderName = `${project.proposalTime || 'YYYY-MM-DD'}｜${project.client}｜${project.market || 'N/A'}`;
-                
+                const status = project.status || 'active';
+                const statusClass = status === 'closed' ? 'bg-gray-500' : 'bg-green-500';
+                const statusText = status === 'closed' ? '已結案' : '進行中';
+
                 card.innerHTML = `<div class="p-6">
-                        <h3 class="text-xl font-bold text-gray-800 truncate" title="${project.name}">${project.name}</h3>
-                        <p class="text-gray-500 text-sm mt-1 truncate" title="${folderName}">${folderName}</p>
+                        <div class="flex justify-between items-start">
+                           <h3 class="text-xl font-bold text-gray-800 truncate pr-4" title="${escapeHTML(project.name)}">${escapeHTML(project.name)}</h3>
+                           <span class="text-xs font-bold text-white ${statusClass} px-2 py-1 rounded-full flex-shrink-0">${statusText}</span>
+                        </div>
+                        <p class="text-gray-500 text-sm mt-1">客戶: ${escapeHTML(project.client)}</p>
+                        <p class="text-xs text-gray-400 mt-2">結案日: ${toLocaleDateString(project.closeDate)}</p>
                         <div class="flex items-center mt-4"><div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div><span class="text-sm font-medium text-gray-700">${progress}%</span></div>
                     </div>`;
                 card.addEventListener('click', () => showProjectDetail(project.id));
@@ -312,9 +319,7 @@
         }
 
         function renderProjectDetail(project) {
-            UI.projectDetailView.innerHTML = '';
-            if (!project) return;
-            
+            UI.projectDetailView.innerHTML = ''; if (!project) return;
             const canEdit = isSuperAdmin(currentUser);
             const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
 
@@ -329,114 +334,110 @@
                 <div class="bg-white p-6 rounded-lg shadow-md mb-8">
                     <div class="flex justify-between items-start">
                         <div>
-                           <h2 class="text-3xl font-bold text-gray-800">${project.name}</h2>
-                           <p class="text-lg text-gray-600 mt-1">客戶: ${project.client}</p>
+                           <h2 class="text-3xl font-bold text-gray-800">${escapeHTML(project.name)}</h2>
+                           <p class="text-lg text-gray-600 mt-1">客戶: ${escapeHTML(project.client)}</p>
                            <div class="mt-4 space-y-2 text-sm">
                               <p><strong>內部報告:</strong> ${project.dashboardLinks?.internal ? `<a href="${project.dashboardLinks.internal}" target="_blank" class="text-indigo-500 hover:underline">連結</a>` : '無'}</p>
                               <p><strong>客戶報告:</strong> ${project.dashboardLinks?.client ? `<a href="${project.dashboardLinks.client}" target="_blank" class="text-indigo-500 hover:underline">連結</a>` : '無'}</p>
                            </div>
                         </div>
-                        <div class="text-right text-sm text-gray-600">
-                           <p>起始日: ${toLocaleString(project.createdAt?.toDate())}</p>
-                           <p>提案日: ${toLocaleDateString(project.proposalTime)}</p>
+                        <div class="text-right text-sm text-gray-600 space-y-1">
+                           <p><strong>狀態:</strong> ${project.status === 'closed' ? '已結案' : '進行中'}</p>
+                           <p><strong>起始日:</strong> ${toLocaleDateString(project.createdAt?.toDate())}</p>
+                           <p><strong>上線日:</strong> ${toLocaleDateString(project.launchDate)}</p>
+                           <p><strong>結案日:</strong> ${toLocaleDateString(project.closeDate)}</p>
                         </div>
                     </div>
                     <div class="mt-6"><h3 class="text-sm font-medium text-gray-500">專案總進度</h3><div class="mt-2 flex items-center"><div class="w-full bg-gray-200 rounded-full h-4 mr-4"><div class="progress-bar bg-indigo-600 h-4 rounded-full" style="width: ${progress}%"></div></div><span class="font-bold">${progress}%</span></div></div>
                 </div>
                 <div id="steps-container" class="space-y-6">${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project)).join('')}</div>`;
             UI.projectDetailView.innerHTML = detailHTML;
-
-            // Listen for comments for each script
             project.brandCreative.scripts.forEach(script => listenForScriptComments(project.id, script.id));
         }
         
-        // *** NEW: Renders a list of logged files ***
         const renderLogList = (logs = []) => {
-            if (logs.length === 0) return '<p class="text-xs text-gray-500">尚無資料</p>';
+            if (logs.length === 0) return '<p class="text-xs text-gray-500 px-2">尚無資料</p>';
             return `<div class="space-y-2 mt-2">${logs.map(log => `
                 <div class="log-item p-2 bg-gray-50 rounded-r-md">
-                    <a href="${log.link}" target="_blank" class="text-sm text-blue-600 hover:underline break-all">${log.link}</a>
-                    <p class="text-xs text-gray-500 text-right mt-1">由 ${log.user} 於 ${toLocaleString(log.date)} 提供</p>
+                    <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all">${escapeHTML(log.link)}</a>
+                    <p class="text-xs text-gray-500 text-right mt-1">由 ${escapeHTML(log.user)} 於 ${toLocaleString(log.date)} 提供</p>
                 </div>`).join('')}</div>`;
         };
         
-        // *** NEW: Renders comments for a single script ***
         function renderScriptComments(comments, scriptId) {
             const container = document.getElementById(`comments-container-${scriptId}`);
             if (!container) return;
             container.innerHTML = comments.length > 0 ? comments.map(c => `
                 <div class="comment-item bg-blue-50 p-2 rounded-r-lg">
-                    <p class="text-sm">${c.text}</p>
-                    <p class="text-xs text-gray-500 text-right mt-1">by ${c.authorName} at ${toLocaleString(c.createdAt?.toDate())}</p>
-                </div>`).join('') : '<p class="text-xs text-gray-500">尚無意見</p>';
+                    <p class="text-sm">${escapeHTML(c.text)}</p>
+                    <p class="text-xs text-gray-500 text-right mt-1">by ${escapeHTML(c.authorName)} at ${toLocaleString(c.createdAt?.toDate())}</p>
+                </div>`).join('') : '<p class="text-xs text-gray-500 px-2">尚無意見</p>';
             container.scrollTop = container.scrollHeight;
         }
 
-        // *** SUPER MODIFIED: Function to render each complex step card ***
         function renderStepCard(stepNum, project) {
             const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
             const isComplete = project.completedSteps?.includes(stepNum);
             const canEdit = isSuperAdmin(currentUser);
 
-            // Sub-renderers for each step's content
+            const renderAdminInput = (inputId, fieldPath, placeholder) => canEdit ? `
+                <div class="mt-4 pt-4 border-t border-dashed">
+                    <div class="flex gap-2 items-center">
+                        <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}">
+                        <button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input="${inputId}">新增</button>
+                    </div>
+                </div>` : '';
+
             const renderStepContent = () => {
                 switch(stepNum) {
-                    case 1: // Briefing
-                        return `
-                          <div class="space-y-4">
+                    case 1:
+                        return `<div class="space-y-4">
                             <div><h5 class="font-bold text-gray-700">a. 文件</h5>${renderLogList(project.briefingFiles?.documents)}</div>
                             <div><h5 class="font-bold text-gray-700">b. Logo (PNG)</h5>${renderLogList(project.briefingFiles?.logos)}</div>
                             <div><h5 class="font-bold text-gray-700">c. 影片素材</h5>${renderLogList(project.briefingFiles?.videos)}</div>
                           </div>
-                          ${canEdit ? `<div class="mt-4 pt-4 border-t space-y-2">
-                                <div class="flex gap-2 items-center"><input type="url" placeholder="新增文件連結..." class="w-full p-1 border rounded" id="input-briefing-doc"><button class="add-log-btn" data-field="briefingFiles.documents" data-input="input-briefing-doc">新增</button></div>
-                                <div class="flex gap-2 items-center"><input type="url" placeholder="新增 Logo 連結..." class="w-full p-1 border rounded" id="input-briefing-logo"><button class="add-log-btn" data-field="briefingFiles.logos" data-input="input-briefing-logo">新增</button></div>
-                                <div class="flex gap-2 items-center"><input type="url" placeholder="新增影片連結..." class="w-full p-1 border rounded" id="input-briefing-video"><button class="add-log-btn" data-field="briefingFiles.videos" data-input="input-briefing-video">新增</button></div>
-                          </div>` : ''}`;
-                    case 2: // AI
-                        return `
-                          <div class="space-y-4">
+                          ${renderAdminInput('input-briefing-doc', 'briefingFiles.documents', '新增文件連結...') +
+                            renderAdminInput('input-briefing-logo', 'briefingFiles.logos', '新增 Logo 連結...') +
+                            renderAdminInput('input-briefing-video', 'briefingFiles.videos', '新增影片連結...')}`;
+                    case 2:
+                        return `<div class="space-y-4">
                             <div><h5 class="font-bold text-gray-700">Excel 文件 1</h5>${renderLogList(project.aiFiles?.file1)}</div>
                             <div><h5 class="font-bold text-gray-700">Excel 文件 2</h5>${renderLogList(project.aiFiles?.file2)}</div>
                           </div>
-                          ${canEdit ? `<div class="mt-4 pt-4 border-t space-y-2">
-                                <div class="flex gap-2 items-center"><input type="url" placeholder="新增文件 1 連結..." class="w-full p-1 border rounded" id="input-ai-1"><button class="add-log-btn" data-field="aiFiles.file1" data-input="input-ai-1">新增</button></div>
-                                <div class="flex gap-2 items-center"><input type="url" placeholder="新增文件 2 連結..." class="w-full p-1 border rounded" id="input-ai-2"><button class="add-log-btn" data-field="aiFiles.file2" data-input="input-ai-2">新增</button></div>
-                          </div>` : ''}`;
-                    case 3: // Media
-                         return `
-                          <div><h5 class="font-bold text-gray-700">提案文件</h5>${renderLogList(project.mediaProposals)}</div>
-                           ${canEdit ? `<div class="mt-4 pt-4 border-t"><div class="flex gap-2 items-center"><input type="url" placeholder="新增提案連結..." class="w-full p-1 border rounded" id="input-media-proposal"><button class="add-log-btn" data-field="mediaProposals" data-input="input-media-proposal">新增</button></div></div>` : ''}`;
-                    case 4: // Brand Creative Process (Redirect Link)
+                          ${renderAdminInput('input-ai-1', 'aiFiles.file1', '新增文件 1 連結...') +
+                            renderAdminInput('input-ai-2', 'aiFiles.file2', '新增文件 2 連結...')}`;
+                    case 3:
+                         return `<div><h5 class="font-bold text-gray-700">提案文件</h5>${renderLogList(project.mediaProposals)}</div>
+                           ${renderAdminInput('input-media-proposal', 'mediaProposals', '新增提案連結...')}`;
+                    case 4:
                         const link = project.brandCreative?.redirectLink || '';
                         return `<div><h5 class="font-bold text-gray-700">跳轉頁面路徑</h5>
-                                <p class="text-sm text-blue-600 break-all">${link ? `<a href="${link}" target="_blank">${link}</a>` : '未提供'}</p></div>
-                                ${canEdit ? `<div class="mt-4 pt-4 border-t"><div class="flex gap-2 items-center"><input type="url" value="${link}" placeholder="設定跳轉連結..." class="w-full p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn" data-field="brandCreative.redirectLink" data-input="input-brand-redirect">儲存</button></div></div>` : ''}`;
-
-                    case 5: // Storyboard
+                                <p class="text-sm text-blue-600 break-all p-2 bg-gray-50 rounded">${link ? `<a href="${link}" target="_blank">${escapeHTML(link)}</a>` : '未提供'}</p></div>
+                                ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input="input-brand-redirect">儲存</button></div></div>` : ''}`;
+                    case 5:
                         return `<div class="space-y-6">
                             ${project.brandCreative.scripts.map(script => {
                                 const isApproved = script.status === 'approved';
                                 return `<div class="p-4 rounded-lg border ${isApproved ? 'script-approved' : 'bg-white'}">
-                                    <h5 class="font-bold text-gray-800">腳本 ${script.id} ${isApproved ? `(已核准)` : ''}</h5>
-                                    ${isApproved ? `<p class="text-xs text-green-700">由 ${script.approvedBy} 於 ${toLocaleString(script.approvalDate)} 核准</p>` : ''}
-                                    <textarea class="w-full mt-2 p-2 border rounded" rows="4" data-script-id="${script.id}" ${isApproved || !canEdit ? 'readonly' : ''}>${script.text}</textarea>
-                                    ${canEdit && !isApproved ? `<button class="save-script-btn text-xs bg-gray-200 px-2 py-1 rounded mt-1" data-script-id="${script.id}">儲存腳本</button>` : ''}
+                                    <h5 class="font-bold text-gray-800">腳本 ${script.id} ${isApproved ? `<span class="text-green-600 font-bold">(已核准)</span>` : ''}</h5>
+                                    ${isApproved ? `<div class="text-xs text-gray-600 bg-green-100 p-2 rounded mt-2">
+                                        <p class="whitespace-pre-wrap break-words">${escapeHTML(script.text) || '無內容'}</p>
+                                        <p class="text-right mt-2 pt-2 border-t border-green-200">由 <strong>${escapeHTML(script.approvedBy)}</strong> 於 ${toLocaleString(script.approvalDate)} 核准</p>
+                                    </div>` : `<textarea class="w-full mt-2 p-2 border rounded" rows="4" data-script-id="${script.id}">${escapeHTML(script.text)}</textarea>
+                                    ${canEdit ? `<button class="save-script-btn text-xs bg-gray-200 px-2 py-1 rounded mt-1 hover:bg-gray-300" data-script-id="${script.id}">儲存腳本</button>` : ''}`}
                                     
                                     <div class="mt-4">
                                         <h6 class="text-sm font-semibold">意見區</h6>
                                         <div id="comments-container-${script.id}" class="space-y-2 mt-2 max-h-40 overflow-y-auto pr-1 text-sm"></div>
-                                        ${!isApproved ? `<div class="flex gap-2 mt-2"><input id="comment-input-${script.id}" type="text" placeholder="輸入意見..." class="w-full p-1 border rounded text-sm"><button class="add-script-comment-btn" data-script-id="${script.id}">送出</button></div>` : ''}
+                                        ${!isApproved ? `<div class="flex gap-2 mt-2"><input id="comment-input-${script.id}" type="text" placeholder="輸入意見..." class="flex-grow p-1 border rounded text-sm"><button class="add-script-comment-btn bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600" data-script-id="${script.id}">送出</button></div>` : ''}
                                     </div>
-                                    ${canEdit && !isApproved ? `<div class="text-right mt-4"><button class="approve-script-btn" data-script-id="${script.id}">審查通過此腳本</button></div>` : ''}
+                                    ${canEdit && !isApproved ? `<div class="text-right mt-4"><button class="approve-script-btn bg-green-600 text-white py-1 px-3 rounded text-sm hover:bg-green-700" data-script-id="${script.id}">審查通過此腳本</button></div>` : ''}
                                 </div>`
                             }).join('')}
                         </div>`;
-
-                    case 6: // Creative Folder
-                        return `
-                          <div><h5 class="font-bold text-gray-700">創意資料夾</h5>${renderLogList(project.creativeFolder)}</div>
-                           ${canEdit ? `<div class="mt-4 pt-4 border-t"><div class="flex gap-2 items-center"><input type="url" placeholder="新增資料夾連結..." class="w-full p-1 border rounded" id="input-creative-folder"><button class="add-log-btn" data-field="creativeFolder" data-input="input-creative-folder">新增</button></div></div>` : ''}`;
+                    case 6:
+                        return `<div><h5 class="font-bold text-gray-700">創意資料夾</h5>${renderLogList(project.creativeFolder)}</div>
+                           ${renderAdminInput('input-creative-folder', 'creativeFolder', '新增資料夾連結...')}`;
                     default: return '';
                 }
             };
@@ -461,7 +462,6 @@
         function listenForProjects() {
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
-            // Super admin sees all projects, others see only their own
             const q = isSuperAdmin(currentUser) ? query(projectsRef) : query(projectsRef, where("members", "array-contains", currentUser.uid));
             unsubscribeProjects = onSnapshot(q, snapshot => {
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -483,7 +483,6 @@
             }, console.error);
         }
 
-        // *** NEW: Listener for comments on a specific script ***
         function listenForScriptComments(projectId, scriptId) {
             if (unsubscribeComments[scriptId]) unsubscribeComments[scriptId]();
             const commentsRef = collection(db, "projects", projectId, "scriptComments");
@@ -498,23 +497,37 @@
         // --- Event Delegation ---
         document.addEventListener('click', async e => {
             const target = e.target;
-            const projectId = target.closest('[data-id]')?.dataset.id;
+            const projectDetail = target.closest('#project-detail-view');
+            const projectId = projectDetail?.querySelector('[data-id]')?.dataset.id || target.closest('[data-id]')?.dataset.id;
             
-            // Generic buttons
+            // Global Buttons
+            if (target.id === 'google-login-btn') handleGoogleLogin();
+            if (target.id === 'logout-button') signOut(auth);
+            if (target.id === 'new-project-btn') openProjectModal();
+            if (target.closest('.close-modal-btn')) { UI.projectModal.classList.add('hidden'); UI.deleteConfirmModal.classList.add('hidden'); }
+            if (target.id === 'cancel-delete-btn') UI.deleteConfirmModal.classList.add('hidden');
+
+            // Project-specific actions
             if (target.id === 'back-to-projects') backToProjectsList();
-            if (target.id === 'edit-project-btn') {
+            
+            if (target.id === 'edit-project-btn' && isSuperAdmin(currentUser)) {
                 const docSnap = await getDoc(doc(db, "projects", target.dataset.id));
                 if (docSnap.exists()) openProjectModal({id: docSnap.id, ...docSnap.data()});
             }
-             if (target.id === 'delete-project-btn') handleDeleteProject(target.dataset.id);
+             if (target.id === 'delete-project-btn' && isSuperAdmin(currentUser)) {
+                UI.deleteConfirmModal.classList.remove('hidden');
+                UI.confirmDeleteBtn.onclick = () => handleDeleteProject(target.dataset.id);
+             }
 
-            // Super Admin actions
-            if (isSuperAdmin(currentUser)) {
+            // --- Super Admin ONLY actions within a project ---
+            if (isSuperAdmin(currentUser) && projectDetail) {
                 if (target.classList.contains('add-log-btn')) {
                     const field = target.dataset.field;
                     const input = document.getElementById(target.dataset.input);
-                    await addFileLog(projectId, field, input.value);
-                    input.value = '';
+                    if (input.value) {
+                       await addFileLog(projectId, field, input.value);
+                       input.value = '';
+                    }
                 }
                 if (target.classList.contains('save-field-btn')) {
                     const field = target.dataset.field;
@@ -523,12 +536,14 @@
                 }
                 if (target.classList.contains('save-script-btn')) {
                     const scriptId = parseInt(target.dataset.scriptId);
-                    const textarea = target.parentElement.querySelector(`textarea[data-script-id="${scriptId}"]`);
+                    const textarea = projectDetail.querySelector(`textarea[data-script-id="${scriptId}"]`);
                     const projectSnap = await getDoc(doc(db, "projects", projectId));
                     const scripts = projectSnap.data().brandCreative.scripts;
                     const scriptIndex = scripts.findIndex(s => s.id === scriptId);
-                    scripts[scriptIndex].text = textarea.value;
-                    await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
+                    if(scriptIndex > -1) {
+                       scripts[scriptIndex].text = textarea.value;
+                       await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
+                    }
                 }
                 if (target.classList.contains('approve-script-btn')) {
                     await approveScript(projectId, parseInt(target.dataset.scriptId));
@@ -562,13 +577,12 @@
                     content.style.maxHeight = '0px';
                     icon.style.transform = 'rotate(0deg)';
                 } else {
-                    content.style.maxHeight = content.scrollHeight + 40 + "px"; // Add padding for safety
+                    content.style.maxHeight = content.scrollHeight + 40 + "px";
                     icon.style.transform = 'rotate(180deg)';
                 }
             }
         });
         
-        // Boilerplate & Cleanup... (included for completeness)
         function backToProjectsList() {
             Object.values(unsubscribeComments).forEach(unsub => unsub());
             unsubscribeComments = {};
@@ -577,15 +591,19 @@
             UI.projectDetailView.innerHTML = '';
             UI.projectsView.classList.remove('hidden');
         }
-        function handleDeleteProject(projectId) { /* ... same as before but adapted for new subcollections ... */ }
+        async function handleDeleteProject(projectId) {
+            const commentsRef = collection(db, "projects", projectId, "scriptComments");
+            const commentsSnap = await getDocs(commentsRef);
+            const batch = writeBatch(db);
+            commentsSnap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            await deleteDoc(doc(db, "projects", projectId));
+            backToProjectsList();
+            UI.deleteConfirmModal.classList.add('hidden');
+        }
         function handleGoogleLogin() { signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error); }
-        UI.googleLoginBtn.addEventListener('click', handleGoogleLogin);
-        UI.logoutBtn.addEventListener('click', () => signOut(auth));
-        UI.userMenuBtn.addEventListener('click', () => UI.userMenu.classList.toggle('hidden'));
-        UI.newProjectBtn.addEventListener('click', () => openProjectModal());
-        UI.closeModalBtns.forEach(btn => btn.addEventListener('click', () => UI.projectModal.classList.add('hidden')));
-        UI.projectForm.addEventListener('submit', handleProjectFormSubmit);
     </script>
 </body>
 </html>
+
 
