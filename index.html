@@ -338,18 +338,60 @@
 
         // --- AUTHENTICATION & App Initialization ---
         onAuthStateChanged(auth, async (user) => {
+            console.log('身份驗證狀態變更:', user ? '已登入' : '未登入');
             UI.loader.classList.add('hidden');
+            
             if (user) {
                 currentUser = { uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL };
-                const userRef = doc(db, "users", user.uid);
-                await setDoc(userRef, { email: user.email, name: user.displayName, avatar: user.photoURL }, { merge: true });
-                await fetchAllUsers();
-                initializeAppUI();
+                console.log('使用者資訊:', currentUser);
+                
+                // 立即顯示應用程式介面
+                UI.loginModal.classList.add('hidden');
+                UI.app.classList.remove('hidden');
+                UI.userName.textContent = currentUser.name || '使用者';
+                UI.userAvatar.src = currentUser.avatar || '';
+                UI.adminBadge.classList.toggle('hidden', !isSuperAdmin(currentUser));
+                
+                // 非同步更新使用者資料和載入專案
+                Promise.all([
+                    setDoc(doc(db, "users", user.uid), { 
+                        email: user.email, 
+                        name: user.displayName, 
+                        avatar: user.photoURL 
+                    }, { merge: true }),
+                    fetchAllUsers()
+                ]).then(() => {
+                    console.log('使用者資料更新完成');
+                    // 測試 Firebase 連接並開始監聽專案
+                    testFirebaseConnection().then(success => {
+                        if (success) {
+                            console.log('Firebase 測試通過，開始監聽專案');
+                            listenForProjects();
+                        } else {
+                            console.error('Firebase 測試失敗，無法載入專案');
+                        }
+                    });
+                    
+                    // 如果是超級管理員，執行遷移並顯示調試面板
+                    if (isSuperAdmin(currentUser)) {
+                        migrateExistingProjects();
+                        UI.debugPanel.classList.remove('hidden');
+                        updateDebugInfo();
+                    }
+                }).catch(error => {
+                    console.error('初始化失敗:', error);
+                });
             } else {
                 currentUser = null;
+                console.log('使用者已登出，清理資源');
+                
+                // 清理監聽器
                 Object.values(unsubscribeComments).forEach(unsub => unsub());
+                unsubscribeComments = {};
                 if (unsubscribeProjects) unsubscribeProjects();
                 if (unsubscribeProjectDetail) unsubscribeProjectDetail();
+                
+                // 顯示登入介面
                 UI.loginModal.classList.remove('hidden');
                 UI.app.classList.add('hidden');
                 UI.adminBadge.classList.add('hidden');
@@ -445,6 +487,25 @@
                 console.error('錯誤：使用者未登入，無法儲存專案。');
                 toggleButtonLoading(submitButton, false, '儲存');
                 return;
+            }
+
+            // 驗證必填欄位
+            const requiredFields = {
+                'project-name-input': '專案名稱',
+                'client-name-input': '客戶名稱',
+                'market-input': '市場國家',
+                'proposal-time-input': '提案時間',
+                'launch-date-input': '實際上線日'
+            };
+            
+            for (const [fieldId, fieldName] of Object.entries(requiredFields)) {
+                const field = UI[fieldId.replace('-input', 'Input')];
+                if (!field || !field.value.trim()) {
+                    alert(`${fieldName}為必填欄位，請填寫完整`);
+                    if (field) field.focus();
+                    toggleButtonLoading(submitButton, false, '儲存');
+                    return;
+                }
             }
 
             try {
@@ -1420,24 +1481,6 @@
             await deleteDoc(doc(db, "projects", projectId));
             backToProjectsList();
             UI.deleteConfirmModal.classList.add('hidden');
-        }
-
-        // 驗證必填欄位
-        const requiredFields = {
-            'project-name-input': '專案名稱',
-            'client-name-input': '客戶名稱',
-            'market-input': '市場國家',
-            'proposal-time-input': '提案時間',
-            'launch-date-input': '實際上線日'
-        };
-        
-        for (const [fieldId, fieldName] of Object.entries(requiredFields)) {
-            const field = UI[fieldId.replace('-input', 'Input')];
-            if (!field || !field.value.trim()) {
-                alert(`${fieldName}為必填欄位，請填寫完整`);
-                if (field) field.focus();
-                return;
-            }
         }
 
     </script>
