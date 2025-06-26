@@ -105,6 +105,12 @@
     <!-- 確認刪除模態框 -->
     <div id="delete-confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full"><h3 class="text-lg font-medium text-gray-900">確認刪除</h3><div class="mt-2"><p class="text-sm text-gray-500">您確定要刪除這個專案嗎？此操作無法復原。</p></div><div class="mt-4 flex justify-end space-x-2"><button id="cancel-delete-btn" class="bg-gray-200 py-2 px-4 rounded-md">取消</button><button id="confirm-delete-btn" class="bg-red-600 text-white py-2 px-4 rounded-md">確認刪除</button></div></div></div>
 
+    <!-- 調試面板 (僅超級管理員可見) -->
+    <div id="debug-panel" class="fixed bottom-4 right-4 bg-white p-4 rounded-lg shadow-lg border hidden">
+        <h3 class="font-bold text-sm mb-2">調試資訊</h3>
+        <div id="debug-content" class="text-xs space-y-1"></div>
+    </div>
+
     <script type="module">
         // --- Firebase v11.6.1 SDKs ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -167,6 +173,8 @@
             deleteConfirmModal: document.getElementById('delete-confirm-modal'),
             cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
             confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
+            debugPanel: document.getElementById('debug-panel'),
+            debugContent: document.getElementById('debug-content'),
         };
 
         // --- Helper Functions ---
@@ -183,6 +191,52 @@
             } else {
                 button.disabled = false;
                 button.innerHTML = originalText;
+            }
+        }
+
+        // 遷移現有專案，確保它們有 projectId 和正確的擁有者資訊
+        async function migrateExistingProjects() {
+            if (!isSuperAdmin(currentUser)) return;
+            
+            try {
+                const projectsRef = collection(db, "projects");
+                const snapshot = await getDocs(projectsRef);
+                const batch = writeBatch(db);
+                let migratedCount = 0;
+                
+                snapshot.docs.forEach(doc => {
+                    const projectData = doc.data();
+                    const updates = {};
+                    
+                    // 如果沒有 projectId，添加一個
+                    if (!projectData.projectId) {
+                        updates.projectId = `PROJ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    }
+                    
+                    // 如果沒有 ownerId 但有 ownerEmail，嘗試找到對應的 UID
+                    if (!projectData.ownerId && projectData.ownerEmail) {
+                        const userUid = Array.from(allUsersCache.keys()).find(uid => 
+                            allUsersCache.get(uid)?.email === projectData.ownerEmail
+                        );
+                        if (userUid) {
+                            updates.ownerId = userUid;
+                            updates.ownerName = allUsersCache.get(userUid)?.name;
+                        }
+                    }
+                    
+                    // 如果有更新，加入批次
+                    if (Object.keys(updates).length > 0) {
+                        batch.update(doc.ref, updates);
+                        migratedCount++;
+                    }
+                });
+                
+                if (migratedCount > 0) {
+                    await batch.commit();
+                    console.log(`已遷移 ${migratedCount} 個專案`);
+                }
+            } catch (error) {
+                console.error('遷移專案失敗:', error);
             }
         }
 
@@ -221,6 +275,27 @@
             UI.userAvatar.src = currentUser.avatar;
             UI.adminBadge.classList.toggle('hidden', !isSuperAdmin(currentUser));
             listenForProjects();
+            
+            // 如果是超級管理員，執行遷移並顯示調試面板
+            if (isSuperAdmin(currentUser)) {
+                migrateExistingProjects();
+                UI.debugPanel.classList.remove('hidden');
+                updateDebugInfo();
+            }
+        }
+
+        function updateDebugInfo() {
+            if (!isSuperAdmin(currentUser)) return;
+            
+            const debugInfo = [
+                `使用者: ${currentUser.name} (${currentUser.email})`,
+                `UID: ${currentUser.uid}`,
+                `超級管理員: ${isSuperAdmin(currentUser)}`,
+                `專案數量: ${allUsersCache.size}`,
+                `時間: ${new Date().toLocaleString('zh-TW')}`
+            ];
+            
+            UI.debugContent.innerHTML = debugInfo.map(info => `<div>${info}</div>`).join('');
         }
 
         // --- CRUD & Core Logic ---
@@ -256,9 +331,13 @@
                     await updateDoc(doc(db, "projects", id), projectData);
                 } else {
                     Object.assign(projectData, {
+                        projectId: `PROJ_${Date.now()}`,
                         ownerId: currentUser.uid,
-                        members: [currentUser.uid], // Store UIDs in an Array
-                        memberEmails: [currentUser.email], // Keep this for display convenience
+                        ownerEmail: currentUser.email,
+                        ownerName: currentUser.name,
+                        members: [currentUser.uid],
+                        memberEmails: [currentUser.email],
+                        memberNames: [currentUser.name],
                         createdAt: serverTimestamp(),
                         completedSteps: [],
                         stepCompletionDates: {},
@@ -272,11 +351,13 @@
                         ]},
                         creativeFolder: []
                     });
-                    await addDoc(collection(db, "projects"), projectData);
+                    const docRef = await addDoc(collection(db, "projects"), projectData);
+                    console.log('新專案已建立，ID:', docRef.id, '專案編碼:', projectData.projectId);
                 }
                 UI.projectModal.classList.add('hidden');
             } catch (error) {
                 console.error("專案儲存失敗:", error);
+                alert('專案儲存失敗: ' + error.message);
             } finally {
                 toggleButtonLoading(submitButton, false, '儲存');
                 UI.projectForm.reset();
@@ -306,17 +387,33 @@
         }
 
         async function addFileLog(projectId, field, link, button) {
-            if (!link.trim()) return;
+            if (!link.trim()) {
+                alert('請輸入有效的連結');
+                return;
+            }
+            
+            console.log('開始新增檔案日誌:', { projectId, field, link });
             toggleButtonLoading(button, true, '新增');
+            
             const logEntry = { 
                 link: link.trim(), 
-                user: { email: currentUser.email, name: currentUser.name, avatar: currentUser.avatar }, 
+                user: { 
+                    uid: currentUser.uid,
+                    email: currentUser.email, 
+                    name: currentUser.name, 
+                    avatar: currentUser.avatar 
+                }, 
                 date: new Date().toISOString() 
             };
+            
             try {
-                await updateDoc(doc(db, "projects", projectId), { [field]: arrayUnion(logEntry) });
+                await updateDoc(doc(db, "projects", projectId), { 
+                    [field]: arrayUnion(logEntry) 
+                });
+                console.log('檔案日誌新增成功:', logEntry);
             } catch (error) {
                 console.error("新增日誌失敗:", error);
+                alert('新增失敗: ' + error.message);
             } finally {
                 toggleButtonLoading(button, false, '新增');
             }
@@ -381,6 +478,8 @@
                            <span class="text-xs font-bold text-white ${statusClass} px-2 py-1 rounded-full flex-shrink-0">${statusText}</span>
                         </div>
                         <p class="text-gray-500 text-sm mt-1">客戶: ${escapeHTML(project.client)}</p>
+                        <p class="text-xs text-gray-400 mt-1">編碼: ${project.projectId || '未設定'}</p>
+                        <p class="text-xs text-gray-400">擁有者: ${project.ownerName || project.ownerEmail || '未知'}</p>
                         <p class="text-xs text-gray-400 mt-2">結案日: ${toLocaleDateString(project.closeDate)}</p>
                         <div class="flex items-center mt-4"><div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div><span class="text-sm font-medium text-gray-700">${progress}%</span></div>
                     </div>`;
@@ -404,6 +503,8 @@
                            <h2 class="text-3xl font-bold text-gray-800">${escapeHTML(project.name)}</h2>
                            <p class="text-lg text-gray-600 mt-1">客戶: ${escapeHTML(project.client)}</p>
                            <div class="mt-4 space-y-2 text-sm">
+                              <p><strong>專案編碼:</strong> ${project.projectId || '未設定'}</p>
+                              <p><strong>專案擁有者:</strong> ${project.ownerName || project.ownerEmail || '未知'}</p>
                               <p><strong>內部報告:</strong> ${project.dashboardLinks?.internal ? `<a href="${project.dashboardLinks.internal}" target="_blank" class="text-indigo-500 hover:underline">連結</a>` : '無'}</p>
                               <p><strong>客戶報告:</strong> ${project.dashboardLinks?.client ? `<a href="${project.dashboardLinks.client}" target="_blank" class="text-indigo-500 hover:underline">連結</a>` : '無'}</p>
                            </div>
@@ -456,6 +557,8 @@
         function renderStepContent(stepNum, project, canEdit) {
             const isComplete = project.completedSteps?.includes(stepNum);
             const renderAdminInput = (inputId, fieldPath, placeholder) => canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}-${stepNum}"><button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button></div></div>` : '';
+            
+            console.log(`渲染步驟 ${stepNum}，可編輯: ${canEdit}，專案ID: ${project.id}`);
             
             let contentHTML = '';
             switch(stepNum) {
@@ -724,10 +827,15 @@
 
                 detailView.querySelectorAll('.add-log-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
-                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                        const inputId = btn.dataset.inputId;
+                        const input = detailView.querySelector(`#${inputId}`);
                         if (input && input.value) {
+                            console.log('新增資料夾連結:', input.value, '欄位:', btn.dataset.field, '輸入ID:', inputId);
                             await addFileLog(projectId, btn.dataset.field, input.value, btn);
                             input.value = '';
+                        } else {
+                            console.error('找不到輸入欄位或輸入為空:', inputId);
+                            alert('請輸入資料夾連結');
                         }
                     });
                 });
