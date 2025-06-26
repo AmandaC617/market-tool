@@ -491,22 +491,27 @@
 
             // 驗證必填欄位
             const requiredFields = {
-                'project-name-input': '專案名稱',
-                'client-name-input': '客戶名稱',
-                'market-input': '市場國家',
-                'proposal-time-input': '提案時間',
-                'launch-date-input': '實際上線日'
+                'projectNameInput': '專案名稱',
+                'clientNameInput': '客戶名稱',
+                'marketInput': '市場國家',
+                'proposalTimeInput': '提案時間',
+                'launchDateInput': '實際上線日'
             };
             
-            for (const [fieldId, fieldName] of Object.entries(requiredFields)) {
-                const field = UI[fieldId.replace('-input', 'Input')];
+            console.log('開始驗證必填欄位...');
+            for (const [fieldName, displayName] of Object.entries(requiredFields)) {
+                const field = UI[fieldName];
+                console.log(`檢查欄位 ${displayName}:`, fieldName, field, field?.value);
+                
                 if (!field || !field.value.trim()) {
-                    alert(`${fieldName}為必填欄位，請填寫完整`);
+                    console.error(`欄位驗證失敗: ${displayName}`, field);
+                    alert(`${displayName}為必填欄位，請填寫完整`);
                     if (field) field.focus();
                     toggleButtonLoading(submitButton, false, '儲存');
                     return;
                 }
             }
+            console.log('所有必填欄位驗證通過');
 
             try {
                 const id = UI.projectIdInput.value;
@@ -838,7 +843,10 @@
                             <p class="text-xs text-yellow-800 font-medium">待完成: ${incompleteSteps.slice(0, 2).join(', ')}${incompleteSteps.length > 2 ? '...' : ''}</p>
                         </div>` : ''}
                     </div>`;
-                card.addEventListener('click', () => showProjectDetail(project.id));
+                card.addEventListener('click', () => {
+                    console.log('點擊專案卡片:', project.id, project.name);
+                    showProjectDetail(project.id);
+                });
                 UI.projectsContainer.appendChild(card);
             });
             
@@ -930,9 +938,9 @@
             switch(stepNum) {
                 case 1:
                     contentHTML = `<div class="space-y-4">
-                        <div><h5 class="font-bold text-gray-700">a. 文件*</h5>${renderLogList(project.briefingFiles?.documents)}</div>
-                        <div><h5 class="font-bold text-gray-700">b. Logo (PNG)*</h5>${renderLogList(project.briefingFiles?.logos)}</div>
-                        <div><h5 class="font-bold text-gray-700">c. 影片素材</h5>${renderLogList(project.briefingFiles?.videos)}</div>
+                        <div><h5 class="font-bold text-gray-700">a. 文件*</h5>${renderLogList(project.briefingFiles?.documents, 'briefingFiles.documents', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">b. Logo (PNG)*</h5>${renderLogList(project.briefingFiles?.logos, 'briefingFiles.logos', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">c. 影片素材</h5>${renderLogList(project.briefingFiles?.videos, 'briefingFiles.videos', canEdit)}</div>
                       </div>
                       ${renderAdminInput('input-briefing-doc', 'briefingFiles.documents', '新增文件連結...', true) +
                         renderAdminInput('input-briefing-logo', 'briefingFiles.logos', '新增 Logo 連結...', true) +
@@ -940,14 +948,14 @@
                     break;
                 case 2:
                     contentHTML = `<div class="space-y-4">
-                        <div><h5 class="font-bold text-gray-700">Excel 文件 1*</h5>${renderLogList(project.aiFiles?.file1)}</div>
-                        <div><h5 class="font-bold text-gray-700">Excel 文件 2*</h5>${renderLogList(project.aiFiles?.file2)}</div>
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 1*</h5>${renderLogList(project.aiFiles?.file1, 'aiFiles.file1', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 2*</h5>${renderLogList(project.aiFiles?.file2, 'aiFiles.file2', canEdit)}</div>
                       </div>
                       ${renderAdminInput('input-ai-1', 'aiFiles.file1', '新增文件 1 連結...', true) +
                         renderAdminInput('input-ai-2', 'aiFiles.file2', '新增文件 2 連結...', true)}`;
                     break;
                 case 3:
-                     contentHTML = `<div><h5 class="font-bold text-gray-700">提案文件*</h5>${renderLogList(project.mediaProposals)}</div>
+                     contentHTML = `<div><h5 class="font-bold text-gray-700">提案文件*</h5>${renderLogList(project.mediaProposals, 'mediaProposals', canEdit)}</div>
                        ${renderAdminInput('input-media-proposal', 'mediaProposals', '新增提案連結...', true)}`;
                     break;
                 case 4:
@@ -1000,7 +1008,7 @@
                         </div>`;
                     break;
                 case 6:
-                    contentHTML = `<div><h5 class="font-bold text-gray-700">創意資料夾*</h5>${renderLogList(project.creativeFolder)}</div>
+                    contentHTML = `<div><h5 class="font-bold text-gray-700">創意資料夾*</h5>${renderLogList(project.creativeFolder, 'creativeFolder', canEdit)}</div>
                        ${renderAdminInput('input-creative-folder', 'creativeFolder', '新增資料夾連結...', true)}`;
                     break;
                 case 7:
@@ -1031,7 +1039,7 @@
                             
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <h5 class="font-bold text-gray-700 mb-3">結案附件</h5>
-                                ${renderLogList(finalReport.attachments)}
+                                ${renderLogList(finalReport.attachments, 'finalReport.attachments', canEdit)}
                                 ${canEdit ? renderAdminInput('input-final-report', 'finalReport.attachments', '新增結案報告附件...') : ''}
                             </div>
                             
@@ -1062,14 +1070,15 @@
             return contentHTML;
         }
 
-        function renderLogList(logs = []) {
+        function renderLogList(logs = [], fieldPath = '', canEdit = false) {
             if (logs.length === 0) return '<p class="text-xs text-gray-500 px-2">尚無資料</p>';
-            return `<div class="space-y-2 mt-2">${logs.map(log => `
+            return `<div class="space-y-2 mt-2">${logs.map((log, index) => `
                 <div class="log-item p-2 bg-gray-50 rounded-r-md flex items-center justify-between">
                     <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all pr-4">${escapeHTML(log.link)}</a>
                     <div class="flex items-center flex-shrink-0">
                         <img src="${escapeHTML(log.user?.avatar)}" alt="${escapeHTML(log.user?.name)}" class="w-5 h-5 rounded-full mr-2">
                         <span class="text-xs text-gray-500">由 ${escapeHTML(log.user?.name)} 於 ${toLocaleString(log.date)} 提供</span>
+                        ${canEdit ? `<button class="delete-log-btn ml-2 text-red-500 hover:text-red-700 text-xs font-bold" data-field="${fieldPath}" data-index="${index}" title="刪除此檔案">×</button>` : ''}
                     </div>
                 </div>`).join('')}</div>`;
         };
@@ -1186,14 +1195,23 @@
         }
         
         function showProjectDetail(projectId) {
+            console.log('顯示專案詳情:', projectId);
             UI.projectsView.classList.add('hidden');
             UI.projectDetailView.classList.remove('hidden');
-            if (unsubscribeProjectDetail) unsubscribeProjectDetail();
+            
+            if (unsubscribeProjectDetail) {
+                console.log('取消之前的專案詳情監聽');
+                unsubscribeProjectDetail();
+            }
+            
             const projectRef = doc(db, "projects", projectId);
+            console.log('開始監聽專案詳情:', projectRef.path);
+            
             unsubscribeProjectDetail = onSnapshot(projectRef, (doc) => {
                 if (doc.exists()) {
                     const projectData = { id: doc.id, ...doc.data() };
                     const canEdit = isSuperAdmin(currentUser);
+                    console.log('專案詳情載入成功:', projectData.name, '可編輯:', canEdit);
                     renderProjectDetail(projectData, canEdit);
                     lastKnownProjectState[projectId] = projectData; 
                     
@@ -1201,10 +1219,13 @@
                         listenForScriptComments(projectId, script.id);
                     });
                 } else {
-                    console.log("Project not found, returning to list.");
+                    console.log("專案不存在，返回列表");
                     backToProjectsList();
                 }
-            }, console.error);
+            }, (error) => {
+                console.error("監聽專案詳情失敗:", error);
+                alert('載入專案詳情失敗: ' + error.message);
+            });
         }
 
         function listenForScriptComments(projectId, scriptId) {
@@ -1252,8 +1273,36 @@
             const projectId = project.id;
             const detailView = UI.projectDetailView;
 
-            detailView.querySelector('#back-to-projects-btn').addEventListener('click', backToProjectsList);
-            
+            console.log('綁定專案詳情事件，專案ID:', projectId, '可編輯:', canEdit);
+
+            // 返回按鈕
+            const backBtn = detailView.querySelector('#back-to-projects-btn');
+            if (backBtn) {
+                backBtn.addEventListener('click', () => {
+                    console.log('點擊返回按鈕');
+                    backToProjectsList();
+                });
+            }
+
+            // 編輯按鈕
+            const editBtn = detailView.querySelector('#edit-project-btn');
+            if (editBtn && canEdit) {
+                editBtn.addEventListener('click', () => {
+                    console.log('點擊編輯按鈕');
+                    openProjectModal(project);
+                });
+            }
+
+            // 刪除按鈕
+            const deleteBtn = detailView.querySelector('#delete-project-btn');
+            if (deleteBtn && canEdit) {
+                deleteBtn.addEventListener('click', () => {
+                    console.log('點擊刪除按鈕');
+                    UI.confirmDeleteBtn.onclick = () => handleDeleteProject(projectId);
+                    UI.deleteConfirmModal.classList.remove('hidden');
+                });
+            }
+
             detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
                 toggler.addEventListener('click', () => {
                     const stepNum = toggler.dataset.stepToggler;
@@ -1275,12 +1324,6 @@
             });
             
             if (canEdit) {
-                detailView.querySelector('#edit-project-btn')?.addEventListener('click', () => openProjectModal(project));
-                detailView.querySelector('#delete-project-btn')?.addEventListener('click', () => {
-                    UI.deleteConfirmModal.classList.remove('hidden');
-                    UI.confirmDeleteBtn.onclick = () => handleDeleteProject(projectId);
-                });
-
                 detailView.querySelectorAll('.add-log-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const inputId = btn.dataset.inputId;
@@ -1430,6 +1473,37 @@
                         }
                     });
                 });
+
+                detailView.querySelectorAll('.delete-log-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const fieldPath = btn.dataset.field;
+                        const index = parseInt(btn.dataset.index);
+                        
+                        if (!confirm('確定要刪除此檔案嗎？')) return;
+                        
+                        console.log('刪除檔案:', fieldPath, '索引:', index);
+                        toggleButtonLoading(btn, true, '刪除中');
+                        
+                        try {
+                            const projectRef = doc(db, "projects", projectId);
+                            const projectSnap = await getDoc(projectRef);
+                            const projectData = projectSnap.data();
+                            
+                            // 根據欄位路徑取得陣列
+                            const fieldArray = fieldPath.split('.').reduce((obj, key) => obj?.[key], projectData) || [];
+                            const updatedArray = fieldArray.filter((_, i) => i !== index);
+                            
+                            // 更新資料庫
+                            await updateDoc(projectRef, { [fieldPath]: updatedArray });
+                            console.log('檔案刪除成功');
+                        } catch (error) {
+                            console.error('刪除檔案失敗:', error);
+                            alert('刪除檔案失敗: ' + error.message);
+                        } finally {
+                            toggleButtonLoading(btn, false, '×');
+                        }
+                    });
+                });
             }
         }
         
@@ -1464,12 +1538,26 @@
         }
 
         function backToProjectsList() {
-            Object.values(unsubscribeComments).forEach(unsub => unsub());
+            console.log('返回專案列表');
+            
+            // 清理監聽器
+            Object.values(unsubscribeComments).forEach(unsub => {
+                console.log('取消評論監聽器');
+                unsub();
+            });
             unsubscribeComments = {};
-            if(unsubscribeProjectDetail) unsubscribeProjectDetail();
+            
+            if(unsubscribeProjectDetail) {
+                console.log('取消專案詳情監聽器');
+                unsubscribeProjectDetail();
+            }
+            
+            // 切換視圖
             UI.projectDetailView.classList.add('hidden');
             UI.projectDetailView.innerHTML = '';
             UI.projectsView.classList.remove('hidden');
+            
+            console.log('已返回專案列表');
         }
 
         async function handleDeleteProject(projectId) {
