@@ -106,7 +106,8 @@
         import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, getDoc, writeBatch, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- App Config & State ---
-        const SUPER_ADMIN_EMAIL = "amanda.chien@timelimtied.com.tw";
+        // *** ATTENTION: Corrected the spelling of "timelimited". Please verify this is correct. ***
+        const SUPER_ADMIN_EMAIL = "amanda.chien@timelimited.com.tw"; 
         const firebaseConfig = {
             apiKey: "AIzaSyALiBzYT1uRmRKBD7nlDLw0TyD3UVyn3S4",
             authDomain: "istagingworkflow.firebaseapp.com",
@@ -313,12 +314,11 @@
                         <p class="text-xs text-gray-400 mt-2">結案日: ${toLocaleDateString(project.closeDate)}</p>
                         <div class="flex items-center mt-4"><div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div><span class="text-sm font-medium text-gray-700">${progress}%</span></div>
                     </div>`;
-                card.addEventListener('click', () => showProjectDetail(project.id, project.ownerId));
+                card.addEventListener('click', () => showProjectDetail(project.id));
             });
         }
 
         function renderProjectDetail(project, canEdit) {
-            const projectId = project.id;
             const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
 
             const detailHTML = `
@@ -352,8 +352,7 @@
             
             UI.projectDetailView.innerHTML = detailHTML;
             
-            // *** NEW: Centralized event binding after rendering ***
-            bindDetailViewEvents(projectId, project, canEdit);
+            bindDetailViewEvents(project, canEdit);
         }
         
         const renderLogList = (logs = []) => {
@@ -416,7 +415,7 @@
                                 ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input-id="input-brand-redirect">儲存</button></div></div>` : ''}`;
                     case 5:
                         return `<div class="space-y-6">
-                            ${project.brandCreative.scripts.map(script => {
+                            ${(project.brandCreative.scripts || []).map(script => {
                                 const isApproved = script.status === 'approved';
                                 return `<div class="p-4 rounded-lg border ${isApproved ? 'script-approved' : 'bg-white'}">
                                     <h5 class="font-bold text-gray-800">腳本 ${script.id} ${isApproved ? `<span class="text-green-600 font-bold">(已核准)</span>` : ''}</h5>
@@ -486,10 +485,13 @@
         }
 
         function listenForScriptComments(projectId, scriptId) {
-            if (unsubscribeComments[scriptId]) unsubscribeComments[scriptId]();
+            const commentListenerId = `comments-${scriptId}`;
+            if (unsubscribeComments[commentListenerId]) unsubscribeComments[commentListenerId]();
+            
             const commentsRef = collection(db, "projects", projectId, "scriptComments");
             const q = query(commentsRef, where("scriptId", "==", scriptId));
-            unsubscribeComments[scriptId] = onSnapshot(q, (snapshot) => {
+            
+            unsubscribeComments[commentListenerId] = onSnapshot(q, (snapshot) => {
                 const comments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
                 comments.sort((a,b) => a.createdAt - b.createdAt);
                 renderScriptComments(comments, scriptId);
@@ -497,14 +499,13 @@
         }
 
         // *** NEW: Centralized event binding function ***
-        function bindDetailViewEvents(projectId, project, canEdit) {
+        function bindDetailViewEvents(project, canEdit) {
+            const projectId = project.id;
             const detailView = UI.projectDetailView;
 
-            // General Actions
             detailView.querySelector('#back-to-projects-btn').addEventListener('click', backToProjectsList);
             // detailView.querySelector('#export-report-btn').addEventListener('click', () => exportProjectReport(projectId));
             
-            // Accordion togglers
             detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
                 toggler.addEventListener('click', () => {
                     const content = document.getElementById(`step-content-${toggler.dataset.stepToggler}`);
@@ -519,7 +520,6 @@
                 });
             });
 
-            // Commenting actions for any user
             detailView.querySelectorAll('.add-script-comment-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const scriptId = parseInt(btn.dataset.scriptId);
@@ -529,7 +529,6 @@
                 });
             });
             
-            // --- Super Admin ONLY Actions ---
             if (canEdit) {
                 detailView.querySelector('#edit-project-btn')?.addEventListener('click', () => openProjectModal(project));
                 detailView.querySelector('#delete-project-btn')?.addEventListener('click', () => {
@@ -609,20 +608,17 @@
         }
 
         async function handleDeleteProject(projectId) {
+            // Delete sub-collection of comments
             const commentsRef = collection(db, "projects", projectId, "scriptComments");
             const commentsSnap = await getDocs(commentsRef);
             const batch = writeBatch(db);
             commentsSnap.docs.forEach(doc => batch.delete(doc.ref));
             await batch.commit();
+            // Delete the main project document
             await deleteDoc(doc(db, "projects", projectId));
             backToProjectsList();
             UI.deleteConfirmModal.classList.add('hidden');
         }
-
-    </script>
-</body>
-</html>
-
 
     </script>
 </body>
