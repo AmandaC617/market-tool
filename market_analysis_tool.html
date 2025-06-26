@@ -1,1033 +1,684 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>市場情資與競品分析平台</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://apis.google.com/js/api.js"></script>
-  <script src="https://accounts.google.com/gsi/client"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            techbg: '#181D27',
-            techpanel: '#22283A',
-            techaccent: '#2EE9E4',
-            techprimary: '#3762F0',
-            techsecondary: '#7D5FFF'
-          },
-          fontFamily: {
-            'tech': ['"Segoe UI"', 'Roboto', 'Arial', 'sans-serif']
-          }
-        }
-      }
-    }
-  </script>
-  <style>
-    body { font-family: "Segoe UI", Roboto, Arial, sans-serif; }
-    .tab.active { border-color: #2EE9E4; background-color: #181D27; color: #2EE9E4; }
-    .panel { display: none; }
-    .panel.active { display: block; animation: fadeIn 0.5s ease; }
-    .locked { opacity: 0.5; pointer-events: none; }
-    .spinner { border: 4px solid rgba(59,130,246,.2); width: 36px; height: 36px; border-radius: 50%; border-left-color: #2EE9E4; animation: spin 1s ease infinite; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    th, td {white-space:nowrap;}
-    .overflow-x-auto {overflow-x:auto;}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>專案工作流程管理系統 (Firebase 版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f0f4f8; }
+        .step-item, .project-card { transition: all 0.3s ease; }
+        .project-card:hover { transform: translateY(-3px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); }
+        .step-complete { background-color: #d1fae5; border-color: #10b981; }
+        .step-pending { background-color: #ffffff; border-color: #d1d5db; }
+        .progress-bar { transition: width 0.5s ease; }
+        .comment-item { border-left: 3px solid #60a5fa; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 1.5s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .skeleton-card { background-color: #ffffff; border-radius: 0.5rem; padding: 1.5rem; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px 0 rgba(0,0,0,0.06); }
+        .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; background-color: #e5e7eb; border-radius: 0.25rem; }
+        @keyframes pulse { 50% { opacity: .5; } }
+        /* A new class for showing/hiding step content with an animation */
+        .step-content { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-out; }
+    </style>
 </head>
-<body class="bg-techbg font-tech text-gray-100 min-h-screen">
-  <header class="bg-techpanel shadow-lg">
-    <div class="container mx-auto px-6 py-4 flex justify-between items-center">
-      <h1 class="text-3xl font-extrabold tracking-wide text-techaccent flex items-center gap-2">
-        <svg class="w-8 h-8 text-techprimary inline-block" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3v2m0 14v2m9-9h-2M5 12H3m15.364-7.364l-1.414 1.414M6.05 17.95l-1.414 1.414m12.728 0l1.414-1.414M6.05 6.05L4.636 4.636" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        市場情資與競品分析平台
-      </h1>
-      <div id="auth-container">
-        <button id="authorize_button" class="hidden bg-gradient-to-tr from-techprimary to-techaccent hover:from-techsecondary hover:to-techaccent font-bold text-white px-5 py-2 rounded-lg shadow-lg tracking-wide transition-all duration-200">使用 Google 帳戶登入</button>
-        <div id="user-profile" class="hidden items-center gap-3">
-          <img id="user-avatar" class="w-10 h-10 rounded-full" src="" alt="User Avatar">
-          <span id="user-name" class="font-semibold text-gray-200"></span>
-          <button id="signout_button" class="text-sm text-gray-400 hover:text-techaccent">登出</button>
-        </div>
-      </div>
+<body class="bg-gray-100">
+
+    <!-- Fullscreen loader -->
+    <div id="initial-loader" class="fixed inset-0 bg-gray-900 bg-opacity-75 flex flex-col items-center justify-center z-50">
+        <div class="loader"></div>
+        <p class="text-white mt-4">正在驗證身分...</p>
     </div>
-  </header>
-  <div id="alert-container" class="sticky top-0 z-50 p-4"></div>
-  <main class="container mx-auto px-6 py-8">
-    <div id="app-container" class="locked">
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div class="lg:col-span-1 space-y-6">
-          <section id="settings-section" class="bg-techpanel rounded-xl shadow-2xl border border-techprimary/20 p-6">
-            <h2 class="text-xl font-bold mb-4 text-techaccent">API & 應用程式設定</h2>
-            <div class="space-y-4">
-              <div>
-                <label for="drive-folder-name" class="block text-sm font-medium text-techaccent">Google Drive 資料夾名稱</label>
-                <input type="text" id="drive-folder-name" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="例如：Project_SaaS_Analysis">
-              </div>
-              <div class="border-b border-techprimary/30 my-4"></div>
-              <div>
-                <label for="google-api-key" class="block text-sm font-medium text-techaccent">Google API 金鑰</label>
-                <input type="password" id="google-api-key" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="請輸入您的 Google API 金鑰">
-              </div>
-              <div>
-                <label for="search-engine-id" class="block text-sm font-medium text-techaccent">可程式化搜尋引擎 ID (CX)</label>
-                <input type="text" id="search-engine-id" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="請輸入您的 CX ID">
-              </div>
-              <div>
-                <label for="ai-gemini-key" class="block text-sm font-medium text-techaccent">Gemini AI API 金鑰</label>
-                <input type="password" id="ai-gemini-key" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="請輸入您的 Gemini API 金鑰">
-              </div>
-              <div>
-                <label for="ai-monica-key" class="block text-sm font-medium text-techaccent">Monica AI API 金鑰</label>
-                <input type="password" id="ai-monica-key" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="請輸入您的 Monica API 金鑰">
-              </div>
-              <button id="save-settings-btn" class="w-full bg-gradient-to-tr from-techprimary to-techaccent hover:from-techsecondary hover:to-techaccent font-bold text-white px-5 py-2 rounded-lg shadow-lg tracking-wide transition-all duration-200">儲存並啟用設定</button>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-md w-full">
+            <h2 class="text-2xl font-bold mb-6 text-center">登入系統</h2>
+            <p class="text-gray-600 mb-6 text-center">請使用 Google 帳號登入以使用專案管理系統。</p>
+            <div class="flex flex-col items-center">
+                <button id="google-login-btn" class="bg-white hover:bg-gray-100 text-gray-700 font-semibold py-2 px-4 border border-gray-300 rounded-lg shadow-sm flex items-center space-x-2">
+                    <svg class="w-5 h-5" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path><path fill="none" d="M0 0h48v48H0z"></path></svg>
+                    <span>使用 Google 帳號登入</span>
+                </button>
             </div>
-            <div>
- <div>
-  <label for="topic-setting" class="block text-sm font-medium text-techaccent">分析主題</label>
-  <input type="text" id="topic-setting" class="..." placeholder="請輸入分析主題（選填）">
-</div>
-          </section>
-          <section id="analysis-input-section" class="bg-techpanel rounded-xl shadow-2xl border border-techprimary/20 p-6 locked">
-            <h2 class="text-xl font-bold mb-4 text-techaccent">分析目標</h2>
-            <div class="space-y-4">
-             <div>
-  <label for="topic" class="block text-sm font-medium text-techaccent">分析主題</label>
-  <input type="text" id="topic" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent" placeholder="請輸入分析主題（選填）">
-</div>
-              <div>
-                <label for="country" class="block text-sm font-medium text-techaccent">國家/地區</label>
-                <select id="country" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent">
-                  <option value="TW">台灣</option>
-                  <option value="CN">中國</option>
-                  <option value="HK">香港</option>
-                  <option value="JP">日本</option>
-                  <option value="KR">韓國</option>
-                  <option value="US">美國</option>
-                  <option value="SG">新加坡</option>
-                  <option value="DE">德國</option>
-                  <option value="GB">英國</option>
-                  <option value="FR">法國</option>
-                  <option value="TH">泰國</option>
-                  <!-- ... 可擴充 -->
-                </select>
-              </div>
-              <div>
-                <label for="language" class="block text-sm font-medium text-techaccent">語言</label>
-                <select id="language" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent">
-                  <option value="zh-TW">繁體中文</option>
-                  <option value="zh-CN">簡體中文</option>
-                  <option value="en">英文</option>
-                  <option value="ja">日文</option>
-                  <option value="ko">韓文</option>
-                  <option value="th">泰文</option>
-                  <option value="de">德文</option>
-                  <option value="fr">法文</option>
-                </select>
-              </div>
-              <div>
-                <label for="industry" class="block text-sm font-medium text-techaccent">產業名稱</label>
-                <input type="text" id="industry" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="如：電子商務">
-              </div>
-              <div>
-                <label for="sector" class="block text-sm font-medium text-techaccent">行業名稱</label>
-                <input type="text" id="sector" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="如：零售">
-              </div>
-              <div>
-                <label for="product" class="block text-sm font-medium text-techaccent">產品名稱</label>
-                <input type="text" id="product" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="如：CRM軟體">
-              </div>
-              <div>
-                <label for="company" class="block text-sm font-medium text-techaccent">公司名稱</label>
-                <input type="text" id="company" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="如：Salesforce">
-              </div>
-              <div>
-                <label class="block text-sm font-medium text-techaccent">商業模式</label>
-                <div class="mt-2 space-x-4">
-                  <label><input type="radio" name="business-model" value="B2C" checked> B2C</label>
-                  <label><input type="radio" name="business-model" value="B2B"> B2B</label>
-                  <label><input type="radio" name="business-model" value="B2B2C"> B2B2C</label>
-                </div>
-              </div>
-              <div>
-                <label for="target-audience" class="block text-sm font-medium text-techaccent">目標市場人群</label>
-                <input type="text" id="target-audience" class="mt-1 w-full px-4 py-2 rounded-lg bg-techbg border border-techprimary/20 focus:outline-none focus:ring-2 focus:ring-techprimary text-techaccent placeholder:text-techprimary/50 transition" placeholder="如：台灣中小企業決策者">
-              </div>
-              <button id="start-analysis-btn" class="w-full bg-gradient-to-tr from-techprimary to-techaccent hover:from-techsecondary hover:to-techaccent font-bold text-white px-5 py-3 rounded-lg shadow-lg tracking-wide transition-all duration-200">開始分析</button>
-            </div>
-          </section>
-          <section id="competitor-select-panel" class="bg-gradient-to-br from-techpanel via-techbg to-techpanel border border-techprimary/30 rounded-xl p-6 shadow-lg mb-4 hidden">
-            <div class="mb-2 font-bold text-techprimary text-lg flex items-center gap-2">
-              <svg class="w-5 h-5 text-techaccent" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              請勾選要深入分析的競爭對手
-            </div>
-            <label class="inline-flex items-center mb-2 mr-6">
-              <input type="checkbox" id="select-all-competitors" class="mr-2 accent-techaccent scale-125">
-              <span>全選</span>
-            </label>
-            <div id="competitor-checkbox-list" class="mb-2"></div>
-            <button id="analyze-selected-btn" class="mt-3 bg-gradient-to-r from-techprimary to-techaccent hover:from-techaccent hover:to-techprimary text-white px-4 py-2 rounded shadow font-bold">進行分析</button>
-          </section>
         </div>
-        <div class="lg:col-span-2 space-y-6">
-          <div class="bg-techpanel rounded-xl shadow-2xl border border-techprimary/20">
-            <div class="flex border-b border-techprimary/20">
-              <button data-tab="results" class="tab-btn tab active flex-1 p-4 font-semibold bg-techpanel text-gray-200 border-b-2 border-transparent hover:border-techaccent hover:text-techaccent transition-all">分析結果</button>
-              <button data-tab="history" class="tab-btn tab flex-1 p-4 font-semibold bg-techpanel text-gray-200 border-b-2 border-transparent hover:border-techaccent hover:text-techaccent transition-all">歷史紀錄</button>
-            </div>
-            <div id="results-panel" class="panel active p-6">
-              <div id="results-content" class="min-h-[400px]">
-                <div id="loading-indicator" class="flex flex-col items-center justify-center h-full">
-                  <div class="spinner hidden"></div>
-                  <p id="loading-status" class="mt-4 text-techaccent font-medium">請先完成左側設定並點擊開始分析</p>
-                </div>
-                <div id="results-tabs-container" class="hidden">
-                  <div class="flex border-b border-techprimary/20">
-                    <button class="result-tab-btn tab active flex-1 p-3 font-semibold" data-result-tab="keywords">A. 關鍵字分析</button>
-                    <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="competitors">B. 競爭對手網站</button>
-                    <button class="result-tab-btn tab flex-1 p-3 font-semibold" data-result-tab="linkedin">C. LinkedIn 分析</button>
-                  </div>
-                  <div id="keywords-result-panel" class="result-panel active p-4 overflow-x-auto"></div>
-                   <div id="keywords-list"></div>
-                  <div id="competitors-result-panel" class="result-panel p-4 overflow-x-auto"></div>
-                  <div id="linkedin-result-panel" class="result-panel p-4 overflow-x-auto"></div>
-                </div>
-              </div>
-              <div id="results-actions" class="hidden mt-4 flex gap-4">
-                <button id="save-analysis-btn" class="flex-1 bg-gradient-to-tr from-techprimary to-techaccent hover:from-techsecondary hover:to-techaccent font-bold text-white px-4 py-2 rounded-lg shadow-lg tracking-wide transition-all duration-200">儲存本次分析</button>
-                <button id="export-excel-btn" class="flex-1 bg-gradient-to-tr from-gray-600 to-gray-800 hover:from-techsecondary hover:to-gray-800 font-bold text-white px-4 py-2 rounded-lg shadow-lg tracking-wide transition-all duration-200">匯出為 Excel</button>
-              </div>
-            </div>
-            <div id="history-panel" class="panel p-6 min-h-[400px]">
-              <div id="history-list" class="space-y-4">
-                <p class="text-gray-500">沒有歷史紀錄。</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
-  </main>
-<script>
-// ------ 狀態管理與 UI 元件 ------
-const state = {
-  gapiReady: false,           // Google API 是否載入
-  gisReady: false,            // Google Identity Service 是否載入
-  tokenClient: null,          // Google OAuth2 Token Client 實例
-  accessToken: null,          // Google 登入 access token
-  userProfile: null,          // 用戶個人資料（若有取得）
-  driveFolderId: null,        // Google Drive 資料夾 ID
-  apiKeys: {
-    google: null,             // Google API 金鑰
-    searchEngineId: null,     // Google Search Engine ID (CX)
-    gemini: '',               // Gemini AI API 金鑰
-    monica: '',               // Monica AI API 金鑰
-    driveFolderName: 'MarketingAnalysisTool_Data' // 預設資料夾名稱
-  },
-  isApiReady: false,          // API 設定是否完成
-  currentResults: null,       // 當前分析結果
-  initialCompetitorNames: []  // 初始競爭對手清單
-};
-const ui = {
-  authorizeButton: document.getElementById('authorize_button'),
-  signOutButton: document.getElementById('signout_button'),
-  userProfile: document.getElementById('user-profile'),
-  appContainer: document.getElementById('app-container'),
-  analysisSection: document.getElementById('analysis-input-section'),
-  saveSettingsBtn: document.getElementById('save-settings-btn'),
-  startAnalysisBtn: document.getElementById('start-analysis-btn'),
-  loadingIndicator: document.getElementById('loading-indicator'),
-  spinner: document.querySelector('.spinner'),
-  loadingStatus: document.getElementById('loading-status'),
-  resultsContainer: document.getElementById('results-tabs-container'),
-  resultsActions: document.getElementById('results-actions'),
-  historyList: document.getElementById('history-list'),
-  competitorSelectPanel: document.getElementById('competitor-select-panel'),
-  competitorCheckboxList: document.getElementById('competitor-checkbox-list'),
-  selectAllCompetitors: document.getElementById('select-all-competitors'),
-  analyzeSelectedBtn: document.getElementById('analyze-selected-btn')
-};
 
-window.onload = () => {
-  gapi.load('client', () => { state.gapiReady = true; checkAuthReady(); });
-  const gisScript = document.createElement('script');
-  gisScript.src = 'https://accounts.google.com/gsi/client';
-  gisScript.async = true; gisScript.defer = true;
-  gisScript.onload = () => {
-    state.tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: "733619441496-5gigdpkv42k84no3q5vvh93ths1e8u29.apps.googleusercontent.com",
-      scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email",
-      callback: gisInCallback,
-    });
-    state.gisReady = true;
-    checkAuthReady();
-  };
-  document.body.appendChild(gisScript);
-  setupEventListeners();
-};
-function handleResultAction(event) {
-  const target = event.target;
-  if (target.id === 'save-analysis-btn') {
-    saveAnalysisToDrive();
-  } else if (target.id === 'export-excel-btn') {
-    exportToExcel();
-  }
-}
-// --------- Monica API 統一端點與 header ---------
-const API_BASE_URL = "https://openapi.monica.im/v1";
-function getMonicaHeaders(apiKey) {
-  return {
-    "Authorization": `Bearer ${apiKey}`,
-    "Content-Type": "application/json"
-  };
-}
-function handleResultAction(event) {
-  const target = event.target;
-  if (target.id === 'save-analysis-btn') {
-    saveAnalysisToDrive();
-  } else if (target.id === 'export-excel-btn') {
-    exportToExcel();
-  }
-}
-function setupEventListeners() {
-  ui.authorizeButton.onclick = handleAuthClick;
-  ui.signOutButton.onclick = handleSignOutClick;
-  ui.saveSettingsBtn.onclick = handleSaveSettings;
-  ui.startAnalysisBtn.onclick = startInitialAnalysis;
-  document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', handleTabSwitch));
-  document.getElementById('history-list').addEventListener('click', handleHistoryAction);
-  document.getElementById('results-actions').addEventListener('click', handleResultAction);
-  document.getElementById('results-tabs-container').addEventListener('click', handleTabSwitch);
-  ui.selectAllCompetitors.addEventListener('change', function(){
-    const all = this.checked;
-    document.querySelectorAll('.competitor-checkbox').forEach(cb => cb.checked = all);
-  });
-  ui.analyzeSelectedBtn.addEventListener('click', analyzeCheckedCompetitors);
-  ui.saveAnalysisBtn.onclick = saveAnalysisToDrive;
-}
-function handleTabSwitch(event) {
-  // 這是一個簡單範例，確保不會再報錯
-  // 你可以根據需求做分頁切換
-  const btn = event.target.closest('.tab-btn');
-  if (!btn) return;
-  document.querySelectorAll('.tab-btn').forEach(tab => tab.classList.remove('active'));
-  btn.classList.add('active');
-  const tab = btn.getAttribute('data-tab');
-  document.querySelectorAll('.panel').forEach(panel => panel.classList.remove('active'));
-  const activePanel = document.getElementById(tab + '-panel');
-  if (activePanel) activePanel.classList.add('active');
-}
-function checkAuthReady() {
-  // 只要登入和API設定齊全，就解鎖分析欄位
-  if (state.gapiReady && state.gisReady) {
-    if (!state.accessToken) {
-      ui.authorizeButton.classList.remove('hidden');
-      ui.userProfile.classList.add('hidden');
-      ui.appContainer.classList.add('locked');
-      ui.analysisSection.classList.add('locked');
-    } else {
-      ui.authorizeButton.classList.add('hidden');
-      ui.userProfile.classList.remove('hidden');
-      ui.appContainer.classList.remove('locked');
-      if (state.isApiReady) {
-        ui.analysisSection.classList.remove('locked');
-      } else {
-        ui.analysisSection.classList.add('locked');
-      }
-    }
-  }
-}
-function showAlert(title, message, type = 'info') {
-  const alertContainer = document.getElementById('alert-container');
-  let color = '';
-  switch(type) {
-    case 'success': color = 'bg-green-600'; break;
-    case 'error': color = 'bg-red-600'; break;
-    case 'warning': color = 'bg-yellow-600 text-black'; break;
-    default: color = 'bg-blue-600'; break;
-  }
-  const alertDiv = document.createElement('div');
-  alertDiv.className = `rounded-lg shadow-lg px-5 py-3 mb-2 font-bold ${color}`;
-  alertDiv.innerHTML = `<strong>${title}</strong> <span class="font-normal">${message}</span>`;
-  alertContainer.appendChild(alertDiv);
-  setTimeout(() => {
-    alertDiv.remove();
-  }, 2600);
-}
-function handleSaveSettings() {
-  state.apiKeys.google = document.getElementById('google-api-key').value.trim();
-  state.apiKeys.searchEngineId = document.getElementById('search-engine-id').value.trim();
-  state.apiKeys.gemini = document.getElementById('ai-gemini-key').value.trim();
-  state.apiKeys.monica = document.getElementById('ai-monica-key').value.trim();
-  state.apiKeys.driveFolderName = document.getElementById('drive-folder-name').value.trim();
+    <!-- Main Application -->
+    <div id="app" class="hidden">
+        <nav class="bg-indigo-600 text-white shadow-md sticky top-0 z-30">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg><h1 class="text-xl font-bold">專案工作流程管理系統</h1></div>
+                <div class="flex items-center"><div class="mr-4 text-right"><span id="user-name" class="font-medium"></span></div><div class="relative"><button id="user-menu-button" class="flex items-center focus:outline-none"><img id="user-avatar" class="h-8 w-8 rounded-full" src="" alt="使用者頭像"></button><div id="user-menu" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-10"><a href="#" id="logout-button" class="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">登出</a></div></div></div>
+            </div>
+        </nav>
+        <main class="container mx-auto px-4 py-8">
+            <div id="projects-view">
+                 <div class="flex justify-between items-center mb-6"><h2 class="text-2xl font-bold text-gray-800">我的專案</h2><button id="new-project-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-md transition duration-300 flex items-center"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" /></svg>新增專案</button></div>
+                 <div id="projects-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+            </div>
+            <div id="project-detail-view" class="hidden"></div>
+        </main>
+    </div>
+    
+    <!-- Add/Edit Project Modal -->
+    <div id="project-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-40 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-8 max-w-2xl w-full">
+            <div class="flex justify-between items-center mb-6"><h2 id="project-modal-title" class="text-2xl font-bold">新增專案</h2><button class="close-modal-btn text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button></div>
+            {/* <!-- *** MODIFIED: Added new fields to the project creation form *** --> */}
+            <form id="project-form"><input type="hidden" id="project-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                    <div><label class="block text-gray-700 mb-2" for="project-name-input">專案名稱*</label><input type="text" id="project-name-input" class="w-full px-4 py-2 border rounded-md" required></div>
+                    <div><label class="block text-gray-700 mb-2" for="client-name-input">客戶名稱*</label><input type="text" id="client-name-input" class="w-full px-4 py-2 border rounded-md" required></div>
+                    <div><label class="block text-gray-700 mb-2" for="market-input">市場*</label><input type="text" id="market-input" class="w-full px-4 py-2 border rounded-md" placeholder="例如: TW, US, JP" required></div>
+                    <div><label class="block text-gray-700 mb-2" for="proposal-time-input">提案時間*</label><input type="date" id="proposal-time-input" class="w-full px-4 py-2 border rounded-md" required></div>
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2" for="looker-studio-link-input">成效報告 Dashboard 連結 (Looker Studio)</label>
+                    <input type="url" id="looker-studio-link-input" class="w-full px-4 py-2 border rounded-md" placeholder="https://lookerstudio.google.com/...">
+                </div>
+                <div class="flex justify-end">
+                    <button type="button" class="close-modal-btn bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-6 rounded-md mr-4">取消</button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-6 rounded-md">儲存</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
-  if (
-    state.apiKeys.google ||
-    state.apiKeys.searchEngineId ||
-    state.apiKeys.gemini ||
-    state.apiKeys.monica
-  ) {
-    state.isApiReady = true;
-    showAlert('設定已儲存', 'API設定已更新，可以進行分析。', 'success');
-  } else {
-    state.isApiReady = false;
-    showAlert('設定不完整', '請至少填寫一組API金鑰。', 'warning');
-  }
-  checkAuthReady(); // <--- 關鍵：這裡要加
-}
-// ------ 登入/登出 UI 狀態控制 ------
-function checkAuthReady() {
-  // 若已登入且 API 設定完成，則解鎖分析欄位
-  if (state.gapiReady && state.gisReady) {
-    if (!state.accessToken) {
-      ui.authorizeButton.classList.remove('hidden');
-      ui.userProfile.classList.add('hidden');
-      ui.appContainer.classList.add('locked');
-      ui.analysisSection.classList.add('locked');
-    } else {
-      ui.authorizeButton.classList.add('hidden');
-      ui.userProfile.classList.remove('hidden');
-      ui.appContainer.classList.remove('locked');
-      if (state.isApiReady) {
-        ui.analysisSection.classList.remove('locked');
-      } else {
-        ui.analysisSection.classList.add('locked');
-      }
-    }
-  }
-}
-function handleAuthClick() {
-  if (state.tokenClient) {
-    state.tokenClient.requestAccessToken();
-  } else {
-    alert('Google Token Client 尚未初始化，請稍後再試。');
-  }
-}
+    <!-- Confirm Delete Modal -->
+    <div id="delete-confirm-modal" class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden"><div class="bg-white rounded-lg shadow-xl p-6 max-w-sm w-full"><h3 class="text-lg font-medium text-gray-900">確認刪除</h3><div class="mt-2"><p class="text-sm text-gray-500">您確定要刪除這個專案嗎？此操作無法復原。</p></div><div class="mt-4 flex justify-end space-x-2"><button id="cancel-delete-btn" class="bg-gray-200 py-2 px-4 rounded-md">取消</button><button id="confirm-delete-btn" class="bg-red-600 text-white py-2 px-4 rounded-md">確認刪除</button></div></div></div>
 
-function gisInCallback(response) {
-  if (response && response.access_token) {
-    state.accessToken = response.access_token;
-    checkAuthReady();
-    // 這裡可以加載 user profile 等
-  }
-}
+    <script type="module">
+        // --- Firebase v11.6.1 SDKs ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, arrayRemove, getDoc, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-function handleSignOutClick() {
-  state.accessToken = null;
-  state.userProfile = null;
-  checkAuthReady();
-}
-// ------ 欄位驗證 ------
-function validateFields() {
-  let valid = false;
-  const fields = ['industry', 'sector', 'product', 'company'];
-  for (let id of fields) {
-    const val = document.getElementById(id).value.trim();
-    if (val) valid = true;
-  }
-  if (!valid) {
-    showAlert('需要輸入', '請至少填寫一個分析欄位（產業、行業、產品、公司）。', 'warning');
-  }
-  return valid;
-}
+        // --- Firebase Config (Please use your own config) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyALiBzYT1uRmRKBD7nlDLw0TyD3UVyn3S4",
+            authDomain: "istagingworkflow.firebaseapp.com",
+            projectId: "istagingworkflow",
+            storageBucket: "istagingworkflow.appspot.com",
+            messagingSenderId: "619527055783",
+            appId: "1:619527055783:web:2636704afb69595e752e82"
+        };
+        
+        // --- App Initialization ---
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        
+        // --- Global State ---
+        let currentUser = null;
+        let unsubscribeProjects = null;
+        let unsubscribeProjectDetail = null;
+        let unsubscribeComments = null; // *** NEW: Listener for comments ***
+        const TOTAL_STEPS = 6; // *** NEW: Total number of steps constant ***
 
-// ------ 取得查詢參數 ------
-function getSearchContext() {
-  return {
-    topic: document.getElementById('topic')?.value.trim() || '',
-    country: document.getElementById('country').value,
-    language: document.getElementById('language').value,
-    industry: document.getElementById('industry').value.trim(),
-    sector: document.getElementById('sector').value.trim(),
-    product: document.getElementById('product').value.trim(),
-    company: document.getElementById('company').value.trim(),
-    businessModel: document.querySelector('input[name="business-model"]:checked').value,
-    targetAudience: document.getElementById('target-audience').value.trim()
-  };
-}
+        // --- UI Elements ---
+        const UI = {
+            loader: document.getElementById('initial-loader'),
+            loginModal: document.getElementById('login-modal'),
+            googleLoginBtn: document.getElementById('google-login-btn'),
+            app: document.getElementById('app'),
+            userName: document.getElementById('user-name'),
+            userAvatar: document.getElementById('user-avatar'),
+            logoutBtn: document.getElementById('logout-button'),
+            userMenuBtn: document.getElementById('user-menu-button'),
+            userMenu: document.getElementById('user-menu'),
+            projectsView: document.getElementById('projects-view'),
+            projectsContainer: document.getElementById('projects-container'),
+            projectDetailView: document.getElementById('project-detail-view'),
+            newProjectBtn: document.getElementById('new-project-btn'),
+            projectModal: document.getElementById('project-modal'),
+            projectModalTitle: document.getElementById('project-modal-title'),
+            projectForm: document.getElementById('project-form'),
+            projectIdInput: document.getElementById('project-id'),
+            projectNameInput: document.getElementById('project-name-input'),
+            clientNameInput: document.getElementById('client-name-input'),
+            marketInput: document.getElementById('market-input'), // *** NEW ***
+            proposalTimeInput: document.getElementById('proposal-time-input'), // *** NEW ***
+            lookerStudioLinkInput: document.getElementById('looker-studio-link-input'), // *** NEW ***
+            closeModalBtns: document.querySelectorAll('.close-modal-btn'),
+            deleteConfirmModal: document.getElementById('delete-confirm-modal'),
+            cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
+            confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
+        };
 
-// ------ 主流程 ------
-async function startInitialAnalysis() {
-  // 新分析前重置排序狀態
-  keywordsSortKey = 'volume';
-  keywordsSortOrder = 'desc';
-  competitorsSortKey = '';
-  competitorsSortOrder = 'desc';
+        // --- AUTHENTICATION ---
+        onAuthStateChanged(auth, user => {
+            UI.loader.classList.add('hidden');
+            if (user) {
+                currentUser = { uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL };
+                initializeAppUI();
+            } else {
+                currentUser = null;
+                // *** MODIFIED: Clear all listeners on logout to prevent memory leaks ***
+                if (unsubscribeProjects) unsubscribeProjects();
+                if (unsubscribeProjectDetail) unsubscribeProjectDetail();
+                if (unsubscribeComments) unsubscribeComments();
+                UI.loginModal.classList.remove('hidden');
+                UI.app.classList.add('hidden');
+            }
+        });
 
-  if (!validateFields()) return;
-  ui.startAnalysisBtn.disabled = true;
-  ui.analyzeSelectedBtn.disabled = true;
+        function handleGoogleLogin() {
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider).catch(error => {
+                console.error("Login Error:", error);
+                if (error.code === 'auth/popup-blocked') {
+                    alert('瀏覽器阻擋了彈出式視窗，請允許彈出式視窗後再試一次。');
+                } else if (error.code === 'auth/unauthorized-domain') {
+                    alert('這個網域尚未被 Firebase 授權，請依照教學文件完成設定。');
+                }
+            });
+        }
 
-  if (!state.isApiReady) { showAlert('API 尚未就緒', '請先儲存您的 API 設定。', 'error'); ui.startAnalysisBtn.disabled = false; ui.analyzeSelectedBtn.disabled = false; return; }
+        // --- UI INITIALIZATION & RENDERING ---
+        function initializeAppUI() {
+            UI.loginModal.classList.add('hidden');
+            UI.app.classList.remove('hidden');
+            UI.userName.textContent = currentUser.name;
+            UI.userAvatar.src = currentUser.avatar;
+            listenForProjects();
+        }
 
-  ui.loadingIndicator.classList.remove('hidden');
-  ui.spinner.classList.remove('hidden');
-  ui.loadingStatus.textContent = '步驟 1/2: 正在生成關鍵字與競爭對手名單...';
-  ui.resultsContainer.classList.add('hidden');
-  ui.resultsActions.classList.add('hidden');
-  ui.competitorSelectPanel.classList.add('hidden');
-  try {
-    const keywordsResponse = await getAiKeywordAnalysis();
-    state.currentResults = { keywords: keywordsResponse.keywords || [] };
-    renderPartialResults('keywords');
-    // 產生競爭對手名稱
-    let aiPromises = [];
-    if (state.apiKeys.gemini) aiPromises.push(getAiCompetitorNames_Gemini().catch(e => { showAlert('Gemini 失敗', 'Gemini未取得競爭對手'); return []; }));
-    if (state.apiKeys.monica) aiPromises.push(getAiCompetitorNames_Monica().catch(e => { showAlert('Monica 失敗', 'Monica未取得競爭對手'); return []; }));
-    if (!aiPromises.length) { showAlert('錯誤', '請至少填寫一組AI API金鑰', 'warning'); return; }
-    const aiResults = await Promise.all(aiPromises);
-    let mergedNames = [];
-    if (aiResults[0]) aiResults[0].forEach(n => mergedNames.push({ name: n, source: state.apiKeys.gemini ? 'Gemini' : '' }));
-    if (aiResults[1]) aiResults[1].forEach(n => {
-      let idx = mergedNames.findIndex(i => i.name === n);
-      if (idx === -1) mergedNames.push({ name: n, source: 'Monica' });
-      else mergedNames[idx].source = mergedNames[idx].source === 'Gemini' ? '兩者' : 'Monica';
-    });
-    if (!mergedNames.length) { showAlert('提示', '查無競爭對手，請調整條件。', 'info'); return; }
-    state.initialCompetitorNames = mergedNames;
-    showCompetitorSelectPanel(mergedNames);
-    ui.loadingStatus.textContent = '請在下方勾選競爭對手並按「進行分析」';
-    ui.spinner.classList.add('hidden');
-  } catch (error) {
-    showAlert('分析失敗', '步驟一失敗: ' + error?.message, 'error');
-    ui.spinner.classList.add('hidden');
-  } finally {
-    ui.startAnalysisBtn.disabled = false;
-    ui.analyzeSelectedBtn.disabled = false;
-  }
-}
-async function analyzeCheckedCompetitors() {
-  ui.startAnalysisBtn.disabled = true;
-  ui.analyzeSelectedBtn.disabled = true;
+        function renderSkeletonProjects() {
+            UI.projectsContainer.innerHTML = Array(3).fill('').map(() => `
+                <div class="skeleton-card"><div class="space-y-4"><div class="h-6 w-3/4 skeleton"></div><div class="space-y-2"><div class="h-4 w-1/2 skeleton"></div><div class="h-4 w-1/3 skeleton"></div></div><div class="h-3 w-full skeleton"></div></div></div>
+            `).join('');
+        }
 
-  const selected = Array.from(document.querySelectorAll('.competitor-checkbox'))
-    .filter(cb => cb.checked)
-    .map(cb => cb.value);
-  if (!selected.length) { showAlert("未選擇", "請至少勾選一個競爭對手。", "warning"); ui.startAnalysisBtn.disabled = false; ui.analyzeSelectedBtn.disabled = false; return; }
-  ui.loadingIndicator.classList.remove('hidden');
-  ui.spinner.classList.remove('hidden');
-  ui.loadingStatus.textContent = "步驟 2/2: 正在取得競爭對手細部資料...";
-  ui.resultsContainer.classList.add('hidden');
-  ui.resultsActions.classList.add('hidden');
-  try {
-    let aiPromises = [];
-    if (state.apiKeys.gemini) aiPromises.push(getAiCompetitorDetails_Gemini(selected).catch(e => { showAlert('Gemini細節失敗',e.message,'warning'); return []; }));
-    if (state.apiKeys.monica) aiPromises.push(getAiCompetitorDetails_Monica(selected).catch(e => { showAlert('Monica細節失敗',e.message,'warning'); return []; }));
-    if (!aiPromises.length) { showAlert('錯誤','請至少填寫一組AI API金鑰','warning'); return; }
-    const aiResults = await Promise.all(aiPromises);
-    let allDetails = [];
-    if (aiResults[0]) aiResults[0].forEach(item => allDetails.push({ ...item, aiSource: state.apiKeys.gemini ? 'Gemini' : '' }));
-    if (aiResults[1]) aiResults[1].forEach(item => {
-      let existing = allDetails.find(d => d.brandName === item.brandName);
-      if (existing) {
-        existing.aiSource = existing.aiSource === 'Gemini' ? '兩者' : 'Monica';
-        for (const key in item) if (item[key] && !existing[key]) existing[key] = item[key];
-      } else {
-        allDetails.push({ ...item, aiSource: 'Monica' });
-      }
-    });
-    state.currentResults.competitors = allDetails;
-    renderPartialResults('competitors');
-    ui.resultsContainer.classList.remove('hidden');
-    ui.resultsActions.classList.remove('hidden');
-    showAlert('分析完成', '競爭對手詳細資料已取得。', 'success');
-  } catch (e) {
-    showAlert('分析失敗', 'AI分析競爭對手細節失敗。', 'error');
-  } finally {
-    ui.spinner.classList.add('hidden');
-    ui.startAnalysisBtn.disabled = false;
-    ui.analyzeSelectedBtn.disabled = false;
-  }
-}
+        function renderProjectsList(projects) {
+            UI.projectsContainer.innerHTML = '';
+            if (projects.length === 0) {
+                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">您尚未加入任何專案，請點擊右上角新增專案。</p>`;
+                return;
+            }
+            // *** NEW: Sort projects by creation date, newest first ***
+            projects.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+            projects.forEach(project => {
+                const card = document.createElement('div');
+                card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
+                const completedCount = project.completedSteps?.length || 0;
+                const progress = Math.round((completedCount / TOTAL_STEPS) * 100);
+                // *** NEW: Generate project folder name for display based on requested format ***
+                const folderName = `${project.proposalTime || 'YYYY-MM-DD'}｜${project.client}｜${project.market || 'N/A'}`;
+                
+                card.innerHTML = `
+                    <div class="p-6">
+                        <h3 class="text-xl font-bold text-gray-800 truncate" title="${project.name}">${project.name}</h3>
+                        <p class="text-gray-500 text-sm mt-1 truncate" title="${folderName}">${folderName}</p>
+                        <div class="flex items-center mt-4">
+                            <div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div>
+                            <span class="text-sm font-medium text-gray-700">${progress}%</span>
+                        </div>
+                    </div>`;
+                card.addEventListener('click', () => showProjectDetail(project.id));
+                UI.projectsContainer.appendChild(card);
+            });
+        }
+        
+        // *** MODIFIED: Heavily updated to render new fields and interactive elements ***
+        function renderProjectDetail(project) {
+            UI.projectDetailView.innerHTML = ''; // Clear previous detail
+            if (!project) return;
+            
+            const completedCount = project.completedSteps?.length || 0;
+            const progress = Math.round((completedCount / TOTAL_STEPS) * 100);
+            const isOwner = project.ownerId === currentUser.uid;
+            const folderName = `${project.proposalTime || 'YYYY-MM-DD'}｜${project.client}｜${project.market || 'N/A'}`;
 
-// ------ 表格排序狀態 ------
-let keywordsSortKey = 'volume';
-let keywordsSortOrder = 'desc';
-let competitorsSortKey = '';
-let competitorsSortOrder = 'desc';
 
-// 強化排序資料型態一致性
-function sortByKey(arr, key, order = 'desc', isNumber = false) {
-  return [...arr].sort((a, b) => {
-    let aVal = a[key] || '';
-    let bVal = b[key] || '';
-    if (key === 'volume') {
-      const volumeMap = {'高': 3, '中': 2, '低': 1};
-      aVal = volumeMap[aVal] !== undefined ? volumeMap[aVal] : (parseFloat(aVal) || 0);
-      bVal = volumeMap[bVal] !== undefined ? volumeMap[bVal] : (parseFloat(bVal) || 0);
-      isNumber = true;
-    }
-    if(isNumber) {
-      aVal = parseFloat(aVal) || 0;
-      bVal = parseFloat(bVal) || 0;
-    }
-    if(aVal < bVal) return order === 'asc' ? -1 : 1;
-    if(aVal > bVal) return order === 'asc' ? 1 : -1;
-    return 0;
-  });
-}
+            const detailHTML = `
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <button id="back-to-projects" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; 返回專案列表</button>
+                    <div class="flex items-center gap-2">
+                        <button id="export-report-btn" data-id="${project.id}" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md">匯出專案報告</button>
+                        ${isOwner ? `
+                        <button id="edit-project-btn" data-id="${project.id}" class="bg-gray-200 py-2 px-4 rounded-md">編輯</button>
+                        <button id="delete-project-btn" data-id="${project.id}" class="bg-red-500 text-white py-2 px-4 rounded-md">刪除</button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+                    <div class="flex justify-between items-start">
+                        <div>
+                           <h2 class="text-3xl font-bold text-gray-800">${project.name}</h2>
+                           <p class="text-lg text-gray-600 mt-1">客戶: ${project.client}</p>
+                           <p class="text-md text-gray-500 mt-2">資料夾: ${folderName}</p>
+                           ${project.lookerStudioLink ? `<a href="${project.lookerStudioLink}" target="_blank" class="text-indigo-500 hover:underline mt-2 inline-block">查看成效報告 Dashboard &rarr;</a>` : ''}
+                        </div>
+                        <div class="text-right">
+                           <p class="text-sm text-gray-500">起始日: ${project.createdAt?.toDate().toLocaleDateString() || 'N/A'}</p>
+                           <p class="text-sm text-gray-500">提案日: ${project.proposalTime || 'N/A'}</p>
+                        </div>
+                    </div>
+                    <div class="mt-6">
+                        <h3 class="text-sm font-medium text-gray-500">專案總進度</h3>
+                        <div class="mt-2 flex items-center">
+                            <div class="w-full bg-gray-200 rounded-full h-4 mr-4"><div class="progress-bar bg-indigo-600 h-4 rounded-full" style="width: ${progress}%"></div></div>
+                            <span class="font-bold">${progress}%</span>
+                        </div>
+                    </div>
+                </div>
+                <div id="steps-container" class="space-y-6">
+                     ${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project)).join('')}
+                </div>`;
+            UI.projectDetailView.innerHTML = detailHTML;
+            
+            // *** NEW: Listen for comments for the storyboard section (step 5) ***
+            listenForComments(project.id, 5);
+        }
 
-// 排序事件 for 關鍵字
-window.sortKeywordsTable = function(key) {
-  if (keywordsSortKey === key) {
-    keywordsSortOrder = keywordsSortOrder === 'asc' ? 'desc' : 'asc';
-  } else {
-    keywordsSortKey = key;
-    keywordsSortOrder = 'desc';
-  }
-  renderPartialResults('keywords');
-};
+        // *** NEW: Heavily modified to be interactive with forms and accordion style ***
+        function renderStepCard(stepNum, project) {
+            const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
+            const isComplete = project.completedSteps?.includes(stepNum);
+            const completionDate = project.stepCompletionDates?.[stepNum];
+            const cardClass = isComplete ? 'step-complete' : 'step-pending';
+            
+            // Define the specific input fields for each step
+            const fields = {
+                1: `<div class="mb-4"><label class="block text-sm font-medium text-gray-700">雲端連結</label><input type="url" data-field="briefingLink" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" value="${project.briefingLink || ''}" placeholder="https://docs.google.com/..."></div>`,
+                2: `<div class="mb-4"><label class="block text-sm font-medium text-gray-700">線上 Web 連結</label><input type="url" data-field="aiLink" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" value="${project.aiLink || ''}" placeholder="https://..."></div>`,
+                3: `<div class="mb-4"><label class="block text-sm font-medium text-gray-700">媒體提案內容</label><textarea data-field="mediaProposalText" rows="4" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="輸入提案文字...">${project.mediaProposalText || ''}</textarea></div>`,
+                4: ` <div class="mb-4 space-y-4">
+                        <div><label class="block text-sm font-medium text-gray-700">品牌 Logo (URL)</label><input type="url" data-field="brandLogoUrl" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" value="${project.brandLogoUrl || ''}" placeholder="https://example.com/logo.png"></div>
+                        <div><label class="block text-sm font-medium text-gray-700">品牌資訊</label><textarea data-field="brandInfo" rows="3" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="輸入品牌相關資訊...">${project.brandInfo || ''}</textarea></div>
+                        <div><label class="block text-sm font-medium text-gray-700">品牌跳轉連結</label><input type="url" data-field="brandLink" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" value="${project.brandLink || ''}" placeholder="https://brand-website.com"></div>
+                    </div>`,
+                5: ` <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700">文案內容</label>
+                        <textarea data-field="storyboardText" rows="5" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="在此輸入 Storyboard 文案...">${project.storyboardText || ''}</textarea>
+                    </div>
+                    <div class="mt-6">
+                        <h4 class="text-lg font-semibold text-gray-800 mb-3">意見修改區</h4>
+                        <div id="comments-container-5" class="space-y-4 mb-4 max-h-60 overflow-y-auto pr-2"></div>
+                        <div class="flex gap-2">
+                           <input type="text" id="comment-input-5" class="flex-grow border-gray-300 rounded-md shadow-sm p-2" placeholder="輸入意見...">
+                           <button class="add-comment-btn bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600" data-step="5" data-id="${project.id}">送出</button>
+                        </div>
+                    </div>`,
+                6: `<div class="mb-4"><label class="block text-sm font-medium text-gray-700">創意資料夾連結 (Google Drive)</label><input type="url" data-field="creativeFolderLink" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" value="${project.creativeFolderLink || ''}" placeholder="https://drive.google.com/..."></div>`,
+            };
 
-// 排序事件 for 競爭對手
-window.sortCompetitorsTable = function(key) {
-  if (competitorsSortKey === key) {
-    competitorsSortOrder = competitorsSortOrder === 'asc' ? 'desc' : 'asc';
-  } else {
-    competitorsSortKey = key;
-    competitorsSortOrder = 'desc';
-  }
-  renderPartialResults('competitors');
-};
+            return `
+                <div id="step-card-${stepNum}" class="step-item ${cardClass} border-2 rounded-lg p-6 bg-white">
+                    <div class="flex justify-between items-center cursor-pointer" data-step-toggler="${stepNum}">
+                        <h3 class="text-xl font-bold">${stepNum}. ${stepTitles[stepNum-1]}</h3>
+                        <div class="flex items-center gap-4">
+                           ${isComplete ? `<span class="text-sm text-green-700 font-medium">完成于: ${new Date(completionDate).toLocaleDateString()}</span>` : `<span class="text-sm text-gray-500">待辦</span>`}
+                           <svg class="w-6 h-6 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                    </div>
+                    <div id="step-content-${stepNum}" class="step-content mt-4 pt-4 border-t border-gray-200">
+                        ${fields[stepNum] || ''}
+                        <div class="mt-4 flex flex-wrap gap-4 justify-between items-center">
+                            <button class="save-step-btn bg-indigo-500 hover:bg-indigo-600 text-white py-2 px-4 rounded-md" data-step="${stepNum}" data-id="${project.id}">儲存此步驟資料</button>
+                            <button class="toggle-step-btn ${isComplete ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white py-2 px-4 rounded-md" data-step="${stepNum}" data-id="${project.id}">
+                                ${isComplete ? '標記為未完成' : '標記為完成'}
+                            </button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+        
+        // *** NEW: Render comments for a specific step ***
+        function renderComments(comments, stepNum) {
+            const container = document.getElementById(`comments-container-${stepNum}`);
+            if (!container) return;
+            container.innerHTML = '';
+            if (comments.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm">尚無任何意見。</p>';
+                return;
+            }
+            comments.forEach(comment => {
+                const div = document.createElement('div');
+                div.className = 'comment-item bg-blue-50 p-3 rounded-r-lg';
+                div.innerHTML = `
+                    <p class="text-gray-800">${comment.text}</p>
+                    <div class="text-xs text-gray-500 text-right mt-1">
+                        <strong>${comment.authorName}</strong> (${comment.authorEmail}) - ${comment.createdAt.toDate().toLocaleString()}
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+            // Scroll to the bottom of the comments
+            container.scrollTop = container.scrollHeight;
+        }
 
-// ------ 結果渲染 ------
-function renderPartialResults(type) {
-  if (type === 'keywords') {
-    const panel = document.getElementById('keywords-result-panel');
-    const keywords = state.currentResults.keywords || [];
-    if (!keywords.length) {
-      panel.innerHTML = '<div class="text-gray-500">查無關鍵字資料。</div>';
-      return;
-    }
-    const sortedKeywords = sortByKey(
-      keywords,
-      keywordsSortKey,
-      keywordsSortOrder,
-      keywordsSortKey === 'volume'
-    );
-    panel.innerHTML = `<table class="w-full text-left text-sm">
-      <thead class="bg-gray-900">
-        <tr class="border-b border-techprimary/30">
-          <th class="py-2 px-2 cursor-pointer" onclick="sortKeywordsTable('keyword')">
-            關鍵字${keywordsSortKey==='keyword'? (keywordsSortOrder==='asc'?' ▲':' ▼') : ''}
-          </th>
-          <th class="cursor-pointer" onclick="sortKeywordsTable('volume')">
-            搜尋量級${keywordsSortKey==='volume'? (keywordsSortOrder==='asc'?' ▲':' ▼') : ''}
-          </th>
-          <th class="cursor-pointer" onclick="sortKeywordsTable('type')">
-            類型${keywordsSortKey==='type'? (keywordsSortOrder==='asc'?' ▲':' ▼') : ''}
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        ${sortedKeywords.map(k => 
-          `<tr class="border-b border-techprimary/20">
-            <td class="py-2 px-2">${k.keyword}</td>
-            <td>${k.volume}</td>
-            <td>${k.type}</td>
-          </tr>`
-        ).join('')}
-      </tbody>
-    </table>`;
-    return;
-  }
 
-  if (type === 'competitors') {
-    const competitorsPanel = document.getElementById('competitors-result-panel');
-    const competitors = state.currentResults.competitors || [];
-    if (!competitors.length) {
-      competitorsPanel.innerHTML = '<div class="text-gray-500">查無競爭對手資料。</div>';
-    } else {
-      const sortedCompetitors = competitorsSortKey
-        ? sortByKey(competitors, competitorsSortKey, competitorsSortOrder)
-        : competitors;
-      competitorsPanel.innerHTML = `<table class="w-full text-sm">
-        <thead>
-          <tr>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('brandName')">
-              品牌名稱${competitorsSortKey==='brandName'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('country')">
-              國家${competitorsSortKey==='country'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('websiteUrl')">
-              網站${competitorsSortKey==='websiteUrl'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('companyType')">
-              公司類型${competitorsSortKey==='companyType'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('linkedinUrl')">
-              LinkedIn${competitorsSortKey==='linkedinUrl'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-            <th class="cursor-pointer" onclick="sortCompetitorsTable('summary')">
-              簡介${competitorsSortKey==='summary'? (competitorsSortOrder==='asc'?' ▲':' ▼') : ''}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          ${sortedCompetitors.map(c =>
-            `<tr>
-              <td>${c.brandName || '-'}</td>
-              <td>${c.country || '-'}</td>
-              <td>${c.websiteUrl ? `<a href="${c.websiteUrl}" target="_blank">${c.websiteUrl}</a>` : '-'}</td>
-              <td>${c.companyType || '-'}</td>
-              <td>${c.linkedinUrl ? `<a href="${c.linkedinUrl}" target="_blank">${c.linkedinUrl}</a>` : '-'}</td>
-              <td>${c.summary || '-'}</td>
-            </tr>`
-          ).join('')}
-        </tbody>
-      </table>`;
-    }
-    // LinkedIn 區塊維持原本寫法
-    const linkedinPanel = document.getElementById('linkedin-result-panel');
-    if (!competitors.length) {
-      linkedinPanel.innerHTML = '<div class="text-gray-500">查無LinkedIn資料。</div>';
-    } else {
-      linkedinPanel.innerHTML = competitors.map(c =>
-        `<div class="p-4 rounded-xl bg-gradient-to-br from-techbg to-techpanel shadow-lg border border-techprimary/20 mb-4">
-          <div class="flex gap-3 items-center">
-            <span class="inline-block w-2 h-2 rounded-full bg-techaccent animate-pulse"></span>
-            <span class="font-bold text-lg text-techaccent">${c.brandName}</span>
-            <span class="text-xs bg-techprimary/20 text-techprimary px-2 py-0.5 rounded ml-2">${c.aiSource || ''}</span>
-          </div>
-          <p class="mt-1 text-gray-200">公司類型：${c.companyType || '-'}</p>
-          <a href="${c.linkedinUrl}" target="_blank" class="block text-techaccent underline hover:text-techprimary mt-1 transition">${c.linkedinUrl||'-'}</a>
-          <div class="mt-2 text-sm text-techprimary/60">
-            股號：${c.stockCode || '-'}<br/>
-            郵遞區號：${c.zipcode || '-'}
-          </div>
-        </div>`
-      ).join('');
-    }
-    return;
-  }
-}
+        // --- FIRESTORE LISTENERS ---
+        function listenForProjects() {
+            if (unsubscribeProjects) unsubscribeProjects();
+            renderSkeletonProjects();
+            const projectsRef = collection(db, "projects");
+            const q = query(projectsRef, where("members", "array-contains", currentUser.uid));
+            unsubscribeProjects = onSnapshot(q, snapshot => {
+                const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProjectsList(projects);
+            }, console.error);
+        }
+        
+        function showProjectDetail(projectId) {
+            UI.projectsView.classList.add('hidden');
+            UI.projectDetailView.classList.remove('hidden');
+            if (unsubscribeProjectDetail) unsubscribeProjectDetail();
+            const projectRef = doc(db, "projects", projectId);
+            unsubscribeProjectDetail = onSnapshot(projectRef, (doc) => {
+                if (doc.exists()) {
+                    renderProjectDetail({ id: doc.id, ...doc.data() });
+                } else {
+                    console.log("Project not found!");
+                    backToProjectsList();
+                }
+            }, console.error);
+        }
 
-// ------ 匯出與儲存 ------
-function exportToExcel() {
-  if (!state.currentResults || !state.currentResults.keywords) {
-    showAlert("無法匯出", "目前尚未有完整分析結果。", "warning");
-    return;
-  }
-  const wb = XLSX.utils.book_new();
-  // 關鍵字
-  const keywordsSheet = XLSX.utils.json_to_sheet(state.currentResults.keywords || []);
-  XLSX.utils.book_append_sheet(wb, keywordsSheet, "A_關鍵字分析");
-  // 競爭對手網站
-  const competitorsSheetData = (state.currentResults.competitors || []).map(c => ({
-      '品牌名稱': c.brandName || '-',
-      '業務摘要': c.summary || '-',
-      '網站': c.websiteUrl || '-',
-      '公司類型': c.companyType || '-',
-      '股票代號': c.stockCode || '-',
-      '郵遞區號': c.zipcode || '-',
-      'AI來源': c.aiSource || '-'
-  }));
-  const competitorsSheet = XLSX.utils.json_to_sheet(competitorsSheetData);
-  XLSX.utils.book_append_sheet(wb, competitorsSheet, "B_競爭對手網站");
-  // LinkedIn
-  const linkedinSheetData = (state.currentResults.competitors || []).map(c => ({
-      '品牌名稱': c.brandName || '-',
-      '公司類型': c.companyType || '-',
-      'LinkedIn': c.linkedinUrl || '-',
-      '股票代號': c.stockCode || '-',
-      '郵遞區號': c.zipcode || '-',
-      'AI來源': c.aiSource || '-'
-  }));
-  const linkedinSheet = XLSX.utils.json_to_sheet(linkedinSheetData);
-  XLSX.utils.book_append_sheet(wb, linkedinSheet, "C_LinkedIn分析");
-  const context = getSearchContext();
-  XLSX.writeFile(wb, `${context.topic || '分析'}_Analysis.xlsx`);
-}
-// ... 其他 function (如 exportToExcel) ...
+        // *** NEW: Firestore listener for comments subcollection ***
+        function listenForComments(projectId, stepNum) {
+            if (unsubscribeComments) unsubscribeComments();
+            const commentsRef = collection(db, "projects", projectId, "comments");
+            const q = query(commentsRef, where("stepId", "==", stepNum));
+            unsubscribeComments = onSnapshot(q, (snapshot) => {
+                const comments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                comments.sort((a,b) => a.createdAt - b.createdAt); // Sort by time
+                renderComments(comments, stepNum);
+            }, console.error);
+        }
 
-async function saveAnalysisToDrive() {
-  if (!state.accessToken) {
-    showAlert('未登入', '請先登入 Google 帳戶。', 'error');
-    return;
-  }
-  if (!state.currentResults) {
-    showAlert('尚無分析結果', '請先執行分析，產生資料。', 'warning');
-    return;
-  }
-  // 產生儲存內容 (你可根據需求改為 JSON、CSV等)
-  const fileContent = JSON.stringify(state.currentResults, null, 2);
-  const blob = new Blob([fileContent], {type: 'application/json'});
-  const metadata = {
-    name: `分析結果_${new Date().toISOString().slice(0,19).replace(/[-T:]/g, "")}.json`,
-    mimeType: 'application/json',
-    parents: state.driveFolderId ? [state.driveFolderId] : undefined
-  };
 
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], {type: 'application/json'}));
-  form.append('file', blob);
+        // --- EVENT HANDLERS ---
+        function backToProjectsList() {
+            if(unsubscribeProjectDetail) unsubscribeProjectDetail();
+            if(unsubscribeComments) unsubscribeComments(); // *** NEW: Unsubscribe comments too ***
+            UI.projectDetailView.classList.add('hidden');
+            UI.projectDetailView.innerHTML = ''; // Clear content to prevent old listeners from lingering
+            UI.projectsView.classList.remove('hidden');
+        }
 
-  const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-    method: 'POST',
-    headers: new Headers({ 'Authorization': 'Bearer ' + state.accessToken }),
-    body: form
-  });
+        // *** MODIFIED: Handle new form fields ***
+        function handleProjectFormSubmit(e) {
+            e.preventDefault();
+            const id = UI.projectIdInput.value;
+            const projectData = {
+                name: UI.projectNameInput.value.trim(),
+                client: UI.clientNameInput.value.trim(),
+                market: UI.marketInput.value.trim(),
+                proposalTime: UI.proposalTimeInput.value,
+                lookerStudioLink: UI.lookerStudioLinkInput.value.trim(),
+                updatedAt: serverTimestamp()
+            };
 
-  if (response.ok) {
-    showAlert('成功', '分析結果已上傳到 Google Drive。', 'success');
-  } else {
-    showAlert('存檔失敗', (await response.json()).error?.message || '發生未知錯誤', 'error');
-  }
-}
-// --------- Gemini 串接 ---------
-async function getAiKeywordAnalysis_Gemini(context) {
-  const prompt = `
-    根據以下分析條件，列出 30 組高相關性的關鍵字（依相關性由高到低排序），格式為 [{"keyword":"xxx", "volume":"高/中/低", "type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
-    條件：${JSON.stringify(context)}
-  `;
-  const apiKey = state.apiKeys.gemini;
-  if (!apiKey) throw new Error('請先填寫 Gemini API Key');
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }]
-  };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  let keywords = [];
-  try {
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const match = text.match(/\[.*\]/s);
-    if (match) {
-      keywords = JSON.parse(match[0]).map(obj => ({
-        ...obj,
-        source: 'Gemini'
-      }));
-    }
-  } catch (e) {
-    throw new Error('Gemini 回傳格式解析失敗');
-  }
-  return keywords;
-}
+            if (id) { // Update existing project
+                updateDoc(doc(db, "projects", id), projectData).then(() => UI.projectModal.classList.add('hidden'));
+            } else { // Create new project
+                // *** NEW: Add all new fields on creation with default empty values ***
+                Object.assign(projectData, {
+                    ownerId: currentUser.uid,
+                    members: [currentUser.uid],
+                    createdAt: serverTimestamp(),
+                    completedSteps: [],
+                    stepCompletionDates: {},
+                    briefingLink: "",
+                    aiLink: "",
+                    mediaProposalText: "",
+                    brandLogoUrl: "",
+                    brandInfo: "",
+                    brandLink: "",
+                    storyboardText: "",
+                    creativeFolderLink: ""
+                });
+                addDoc(collection(db, "projects"), projectData).then(() => UI.projectModal.classList.add('hidden'));
+            }
+        }
 
-// --------- Monica 串接 ---------
-async function getAiKeywordAnalysis_Monica(context) {
-  const prompt = `
-    依據這些條件，列出30個高相關性的關鍵字（依相關性由高到低排序），回傳格式為 [{"keyword":"xxx","volume":"高/中/低","type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
-    條件：${JSON.stringify(context)}
-  `;
-  const apiKey = state.apiKeys.monica;
-  if (!apiKey) throw new Error('請先填寫 Monica API Key');
-  // 用 API_BASE_URL
-  const url = `${API_BASE_URL}/chat/completions`;
-  const body = {
-    model: "monica-16k",
-    messages: [{ role: "user", content: prompt }],
-    stream: false
-  };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: getMonicaHeaders(apiKey),  // 用統一 header
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  let keywords = [];
-  try {
-    const text = data.choices?.[0]?.message?.content || '';
-    const match = text.match(/\[.*\]/s);
-    if (match) {
-      keywords = JSON.parse(match[0]).map(obj => ({
-        ...obj,
-        source: 'Monica'
-      }));
-    }
-  } catch (e) {
-    throw new Error('Monica 回傳格式解析失敗');
-  }
-  return keywords;
-}
+        // *** MODIFIED: Handle new form fields when opening the modal ***
+        function openProjectModal(project = null) {
+            UI.projectForm.reset();
+            if (project) {
+                UI.projectModalTitle.textContent = "編輯專案";
+                UI.projectIdInput.value = project.id;
+                UI.projectNameInput.value = project.name;
+                UI.clientNameInput.value = project.client;
+                UI.marketInput.value = project.market;
+                UI.proposalTimeInput.value = project.proposalTime;
+                UI.lookerStudioLinkInput.value = project.lookerStudioLink || '';
+            } else {
+                UI.projectModalTitle.textContent = "新增專案";
+                UI.projectIdInput.value = '';
+            }
+            UI.projectModal.classList.remove('hidden');
+        }
 
-// --------- 合併 & 去重 ---------
-function mergeAndDedupKeywords(arrays) {
-  const map = new Map();
-  arrays.flat().forEach(obj => {
-    const key = obj.keyword.trim();
-    if (!map.has(key)) {
-      map.set(key, obj);
-    } else {
-      // 標註多來源
-      const exist = map.get(key);
-      if (exist.source && obj.source && !exist.source.includes(obj.source)) {
-        exist.source += `,${obj.source}`;
-      }
-    }
-  });
-  // 保持原排序
-  return Array.from(map.values());
-}
+        // *** MODIFIED: Store completion date when toggling status ***
+        async function toggleStepComplete(projectId, stepNum) {
+            const projectRef = doc(db, "projects", projectId);
+            const projectSnap = await getDoc(projectRef);
+            if (!projectSnap.exists()) return;
+            
+            const project = projectSnap.data();
+            const isComplete = project.completedSteps?.includes(stepNum);
+            
+            const updateData = {
+                completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
+                // Use dot notation to update a specific key in a map
+                [`stepCompletionDates.${stepNum}`]: isComplete ? deleteDoc : new Date().toISOString()
+            };
+            
+            await updateDoc(projectRef, updateData);
+        }
 
-// --------- 並行呼叫兩AI ---------
-async function getAiKeywordAnalysisBoth(context) {
-  const apis = [];
-  if (state.apiKeys.gemini) apis.push(getAiKeywordAnalysis_Gemini(context));
-  if (state.apiKeys.monica) apis.push(getAiKeywordAnalysis_Monica(context));
-  if (apis.length === 0) throw new Error("請先填寫至少一組 AI API Key");
-  const results = await Promise.all(apis);
-  const allKeywords = mergeAndDedupKeywords(results);
-  return {
-    all: allKeywords,
-    gemini: results[0] || [],
-    monica: results[1] || []
-  };
-}
+        // *** NEW: Save data for a specific step card ***
+        function saveStepData(projectId, stepNum) {
+            const card = document.getElementById(`step-card-${stepNum}`);
+            if (!card) return;
+            const inputs = card.querySelectorAll('[data-field]');
+            const updateData = {};
+            inputs.forEach(input => {
+                const fieldName = input.dataset.field;
+                updateData[fieldName] = input.value;
+            });
 
-// --------- 顯示工具 ---------
-function renderKeywords(keywordList) {
-  if (!keywordList.length) return "<li>無資料</li>";
-  return keywordList.map((obj, idx) =>
-    `<li>${idx + 1}. ${obj.keyword}（熱度：${obj.volume}，類型：${obj.type}，來源：${obj.source}）</li>`
-  ).join('');
-}
+            if (Object.keys(updateData).length > 0) {
+                updateDoc(doc(db, "projects", projectId), updateData)
+                    .then(() => {
+                        // Give visual feedback to the user
+                        const btn = card.querySelector('.save-step-btn');
+                        btn.textContent = '已儲存!';
+                        btn.classList.add('bg-green-500');
+                        setTimeout(() => { 
+                            btn.textContent = '儲存此步驟資料';
+                            btn.classList.remove('bg-green-500');
+                        }, 2000);
+                    })
+                    .catch(console.error);
+            }
+        }
 
-// --------- 主流程：取得並顯示 ---------
-async function showKeywords(context) {
-  try {
-    document.getElementById('keywords-list').innerHTML = '分析中...';
-    const result = await getAiKeywordAnalysisBoth(context);
-    document.getElementById('keywords-list').innerHTML =
-      '<ul>' + renderKeywords(result.all) + '</ul>';
-    // 如需分開顯示 gemini/monica 結果，也可用 result.gemini, result.monica
-  } catch (e) {
-    document.getElementById('keywords-list').innerHTML =
-      `<span style="color:red">AI 關鍵字分析失敗：${e.message}</span>`;
-  }
-}
-// --------- AI 關鍵字分析函式區塊 PATCH ---------
-async function getAiKeywordAnalysis_Gemini(context) {
-  const prompt = `
-    根據以下分析條件，列出 30 組高相關性的關鍵字（依相關性由高到低排序），格式為 [{"keyword":"xxx", "volume":"高/中/低", "type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
-    條件：${JSON.stringify(context)}
-  `;
-  const apiKey = state.apiKeys.gemini;
-  if (!apiKey) throw new Error('請先填寫 Gemini API Key');
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + apiKey;
-  const body = {
-    contents: [{ parts: [{ text: prompt }] }]
-  };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  let keywords = [];
-  try {
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const match = text.match(/\[.*\]/s);
-    if (match) {
-      keywords = JSON.parse(match[0]).map(obj => ({
-        ...obj,
-        source: 'Gemini'
-      }));
-    }
-  } catch (e) {
-    throw new Error('Gemini 回傳格式解析失敗');
-  }
-  return keywords;
-}
+        // *** NEW: Add a comment to the storyboard ***
+        async function addComment(projectId, stepNum) {
+            const input = document.getElementById(`comment-input-${stepNum}`);
+            const text = input.value.trim();
+            if (!text) return;
+            
+            const commentData = {
+                text: text,
+                stepId: stepNum,
+                authorName: currentUser.name,
+                authorEmail: currentUser.email,
+                authorId: currentUser.uid,
+                createdAt: serverTimestamp()
+            };
 
-async function getAiKeywordAnalysis_Monica(context) {
-  const prompt = `
-    依據這些條件，列出30個高相關性的關鍵字（依相關性由高到低排序），回傳格式為 [{"keyword":"xxx","volume":"高/中/低","type":"xxx"}]，只回傳 JSON 陣列即可，且必須依相關性排序：
-    條件：${JSON.stringify(context)}
-  `;
-  const apiKey = state.apiKeys.monica;
-  if (!apiKey) throw new Error('請先填寫 Monica API Key');
-  const url = "https://openapi.monica.im/v1/chat/completions";
-  const body = {
-    model: "monica-16k",
-    messages: [{ role: "user", content: prompt }],
-    stream: false
-  };
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer " + apiKey
-    },
-    body: JSON.stringify(body)
-  });
-  const data = await res.json();
-  let keywords = [];
-  try {
-    const text = data.choices?.[0]?.message?.content || '';
-    const match = text.match(/\[.*\]/s);
-    if (match) {
-      keywords = JSON.parse(match[0]).map(obj => ({
-        ...obj,
-        source: 'Monica'
-      }));
-    }
-  } catch (e) {
-    throw new Error('Monica 回傳格式解析失敗');
-  }
-  return keywords;
-}
+            await addDoc(collection(db, "projects", projectId, "comments"), commentData);
+            input.value = '';
+        }
 
-function mergeAndDedupKeywords(arrays) {
-  const map = new Map();
-  arrays.flat().forEach(obj => {
-    const key = obj.keyword.trim();
-    if (!map.has(key)) {
-      map.set(key, obj);
-    } else {
-      const exist = map.get(key);
-      if (exist.source && obj.source && !exist.source.includes(obj.source)) {
-        exist.source += `,${obj.source}`;
-      }
-    }
-  });
-  return Array.from(map.values());
-}
+        // *** NEW: Export project data as a text file ***
+        async function exportProjectReport(projectId) {
+            const projectRef = doc(db, "projects", projectId);
+            const projectSnap = await getDoc(projectRef);
+            if (!projectSnap.exists()) return alert('找不到專案資料!');
+            const project = projectSnap.data();
 
-async function getAiKeywordAnalysisBoth(context) {
-  const apis = [];
-  if (state.apiKeys.gemini) apis.push(getAiKeywordAnalysis_Gemini(context));
-  if (state.apiKeys.monica) apis.push(getAiKeywordAnalysis_Monica(context));
-  if (apis.length === 0) throw new Error("請先填寫至少一組 AI API Key");
-  const results = await Promise.all(apis);
-  const allKeywords = mergeAndDedupKeywords(results);
-  return {
-    all: allKeywords,
-    gemini: results[0] || [],
-    monica: results[1] || []
-  };
-}
-async function getAiKeywordAnalysis() {
-  const context = getSearchContext();
-  const result = await getAiKeywordAnalysisBoth(context);
-  return { keywords: result.all };
-}
+            const commentsRef = collection(db, "projects", projectId, "comments");
+            const q = query(commentsRef, where("stepId", "==", 5));
+            const commentsSnap = await getDocs(q);
+            const comments = commentsSnap.docs.map(d => d.data());
 
-// ------ 顯示工具（如需單獨顯示用） ------
-function renderKeywords(keywordList) {
-  if (!keywordList.length) return "<li>無資料</li>";
-  return keywordList.map((obj, idx) =>
-    `<li>${idx + 1}. ${obj.keyword}（熱度：${obj.volume}，類型：${obj.type}，來源：${obj.source}）</li>`
-  ).join('');
-}
+            let reportContent = `
+# 專案報告: ${project.name}
 
-// 如果你想測試可加這行：
-// showKeywords(getSearchContext());
-// --------- 用法範例 ---------
-// 頁面需有 <div id="keywords-list"></div>
-// const context = { topic: "AI行銷工具", otherInfo: "B2B產業" };
-// showKeywords(context);
+## 基本資訊
+- **客戶:** ${project.client || 'N/A'}
+- **市場:** ${project.market || 'N/A'}
+- **提案日期:** ${project.proposalTime || 'N/A'}
+- **建立日期:** ${project.createdAt?.toDate().toLocaleString() || 'N/A'}
+- **Looker Studio:** ${project.lookerStudioLink || '未提供'}
 
-// ...（其餘如 Google Drive、showAlert 等維持原本即可）
-</script>
+---
+
+## 步驟詳情
+`;
+            const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
+            const stepFields = {
+                1: { '雲端連結': project.briefingLink },
+                2: { '線上 Web 連結': project.aiLink },
+                3: { '媒體提案內容': project.mediaProposalText },
+                4: { '品牌 Logo URL': project.brandLogoUrl, '品牌資訊': project.brandInfo, '品牌跳轉連結': project.brandLink },
+                5: { 'Storyboard 文案': project.storyboardText },
+                6: { '創意資料夾連結': project.creativeFolderLink }
+            };
+
+            for (let i = 1; i <= TOTAL_STEPS; i++) {
+                const isComplete = project.completedSteps.includes(i);
+                const completionDate = project.stepCompletionDates?.[i];
+                reportContent += `
+### ${i}. ${stepTitles[i-1]}
+- **狀態:** ${isComplete ? `完成 (${new Date(completionDate).toLocaleString()})` : '待辦'}
+`;
+                for (const [key, value] of Object.entries(stepFields[i])) {
+                    reportContent += `- **${key}:**\n  ${value || '無內容'}\n`;
+                }
+                if (i === 5) {
+                    reportContent += '- **意見修改:**\n';
+                    if (comments.length > 0) {
+                        comments.sort((a,b) => a.createdAt - b.createdAt).forEach(c => {
+                            reportContent += `  - [${c.createdAt.toDate().toLocaleString()}] ${c.authorName}: ${c.text}\n`;
+                        });
+                    } else {
+                        reportContent += '  無\n';
+                    }
+                }
+                reportContent += '\n---\n';
+            }
+
+            const blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `專案報告-${project.name}.txt`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // *** MODIFIED: Delete all comments in a subcollection when deleting a project to avoid orphaned data ***
+        async function handleDeleteProject(projectId) {
+            UI.deleteConfirmModal.classList.remove('hidden');
+            UI.confirmDeleteBtn.onclick = async () => {
+                try {
+                    // Also delete comments subcollection
+                    const commentsRef = collection(db, "projects", projectId, "comments");
+                    const commentsSnap = await getDocs(commentsRef);
+                    const batch = writeBatch(db);
+                    commentsSnap.docs.forEach(doc => {
+                        batch.delete(doc.ref);
+                    });
+                    await batch.commit();
+
+                    // Delete the project doc itself
+                    await deleteDoc(doc(db, "projects", projectId));
+                    
+                    backToProjectsList();
+                } catch (error) {
+                    console.error("Error deleting project:", error);
+                    alert("刪除專案時發生錯誤。");
+                } finally {
+                    UI.deleteConfirmModal.classList.add('hidden');
+                }
+            };
+        }
+
+        // --- EVENT LISTENERS BINDING ---
+        UI.googleLoginBtn.addEventListener('click', handleGoogleLogin);
+        UI.logoutBtn.addEventListener('click', () => signOut(auth));
+        UI.userMenuBtn.addEventListener('click', () => UI.userMenu.classList.toggle('hidden'));
+        UI.newProjectBtn.addEventListener('click', () => openProjectModal());
+        UI.closeModalBtns.forEach(btn => btn.addEventListener('click', () => {
+            UI.projectModal.classList.add('hidden');
+            UI.deleteConfirmModal.classList.add('hidden');
+        }));
+        UI.projectForm.addEventListener('submit', handleProjectFormSubmit);
+        UI.cancelDeleteBtn.addEventListener('click', () => UI.deleteConfirmModal.classList.add('hidden'));
+        
+        // *** MODIFIED: Use event delegation for dynamically created content ***
+        document.addEventListener('click', async e => {
+            // Back button
+            if (e.target.id === 'back-to-projects') backToProjectsList();
+            
+            // Edit project main details
+            if (e.target.id === 'edit-project-btn') {
+                const projectId = e.target.dataset.id;
+                const docSnap = await getDoc(doc(db, "projects", projectId));
+                if (docSnap.exists()) openProjectModal({id: docSnap.id, ...docSnap.data()});
+            }
+
+            // Delete project
+            if (e.target.id === 'delete-project-btn') handleDeleteProject(e.target.dataset.id);
+            
+            // Toggle step complete status
+            if (e.target.classList.contains('toggle-step-btn')) {
+                const { id, step } = e.target.dataset;
+                toggleStepComplete(id, parseInt(step));
+            }
+
+            // *** NEW event listeners for dynamic content ***
+            // Save data within a step card
+            if (e.target.classList.contains('save-step-btn')) {
+                const { id, step } = e.target.dataset;
+                saveStepData(id, parseInt(step));
+            }
+            // Add a new comment
+            if (e.target.classList.contains('add-comment-btn')) {
+                e.preventDefault(); // Prevent form submission if it's in a form
+                const { id, step } = e.target.dataset;
+                addComment(id, parseInt(step));
+            }
+            // Export report
+            if (e.target.id === 'export-report-btn') {
+                exportProjectReport(e.target.dataset.id);
+            }
+            // Toggle step content visibility (accordion)
+            const toggler = e.target.closest('[data-step-toggler]');
+            if (toggler) {
+                const stepNum = toggler.dataset.stepToggler;
+                const content = document.getElementById(`step-content-${stepNum}`);
+                const icon = toggler.querySelector('svg');
+                if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                    content.style.maxHeight = '0px';
+                    icon.style.transform = 'rotate(0deg)';
+                } else {
+                    // Set max-height to its scroll height to animate open
+                    content.style.maxHeight = content.scrollHeight + "px";
+                    icon.style.transform = 'rotate(180deg)';
+                }
+            }
+        });
+
+    </script>
 </body>
 </html>
