@@ -253,14 +253,8 @@
                 } else {
                     Object.assign(projectData, {
                         ownerId: currentUser.uid,
-                        members: {
-                            [currentUser.uid]: {
-                                email: currentUser.email,
-                                name: currentUser.name,
-                                avatar: currentUser.avatar,
-                                role: 'manager'
-                            }
-                        },
+                        members: [currentUser.uid], // Start with the creator's UID in an array
+                        memberEmails: [currentUser.email], // Also store email for display
                         createdAt: serverTimestamp(),
                         completedSteps: [],
                         stepCompletionDates: {},
@@ -329,7 +323,7 @@
         async function addScriptComment(projectId, scriptId, text, button) {
              if (!text.trim()) return;
              toggleButtonLoading(button, true, '送出');
-             const commentData = { text, scriptId, author: { email: currentUser.email, name: currentUser.name, avatar: currentUser.avatar }, createdAt: serverTimestamp() };
+             const commentData = { text, scriptId, author: { uid: currentUser.uid, email: currentUser.email, name: currentUser.name, avatar: currentUser.avatar }, createdAt: serverTimestamp() };
              try {
                 await addDoc(collection(db, "projects", projectId, "scriptComments"), commentData);
              } catch(error) {
@@ -368,7 +362,7 @@
             if (projects.length === 0) {
                 UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
-            // *** MODIFIED: More robust sorting ***
+            // *** MODIFIED: More robust sorting based on user feedback ***
             projects.sort((a, b) => {
                 const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
                 const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
@@ -545,14 +539,14 @@
             const container = UI.projectDetailView.querySelector('#member-management-container');
             if (!container || !canEdit) return;
 
-            const membersHTML = Object.values(project.members || {}).map(member => `
+            const membersHTML = Object.entries(project.members || {}).map(([uid, member]) => `
                 <li class="flex items-center justify-between py-1">
                     <div class="flex items-center">
                         <img src="${escapeHTML(member.avatar)}" alt="${escapeHTML(member.name)}" class="w-6 h-6 rounded-full mr-2">
                         <span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span>
                         <span class="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">${member.role || 'member'}</span>
                     </div>
-                    ${member.email !== SUPER_ADMIN_EMAIL ? `<button class="remove-member-btn text-red-500 hover:text-red-700 text-xs font-bold" data-email="${escapeHTML(member.email)}">移除</button>` : ''}
+                    ${member.email !== SUPER_ADMIN_EMAIL ? `<button class="remove-member-btn text-red-500 hover:text-red-700 text-xs font-bold" data-uid="${uid}">移除</button>` : ''}
                 </li>
             `).join('');
 
@@ -597,7 +591,7 @@
 
         function checkForNewActivity(project) {
             const previousState = lastKnownProjectState[project.id];
-            if (!previousState) return; // First time loading, do nothing
+            if (!previousState) return; 
 
             const logStepMapping = { 1: ['briefingFiles.documents', 'briefingFiles.logos', 'briefingFiles.videos'], 2: ['aiFiles.file1', 'aiFiles.file2'], 3: ['mediaProposals'], 6: ['creativeFolder'] };
             
@@ -642,7 +636,7 @@
                     const projectData = { id: doc.id, ...doc.data() };
                     const canEdit = isSuperAdmin(currentUser);
                     renderProjectDetail(projectData, canEdit);
-                    lastKnownProjectState[projectId] = projectData; // Store state for comparison
+                    lastKnownProjectState[projectId] = projectData; 
                     
                     (projectData.brandCreative?.scripts || []).forEach(script => {
                         listenForScriptComments(projectId, script.id);
@@ -700,7 +694,6 @@
             const detailView = UI.projectDetailView;
 
             detailView.querySelector('#back-to-projects-btn').addEventListener('click', backToProjectsList);
-            // ... export button logic ...
             
             detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
                 toggler.addEventListener('click', () => {
@@ -786,9 +779,7 @@
                                 completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
                                 [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
                             });
-                        } finally {
-                            // Re-render will handle the button text, no need to toggle off
-                        }
+                        } finally {}
                     });
                 });
 
@@ -816,7 +807,7 @@
                                     email: newMemberData.email,
                                     name: newMemberData.name,
                                     avatar: newMemberData.avatar,
-                                    role: 'member' // Default role
+                                    role: 'member'
                                 }
                             });
                             emailInput.value = '';
@@ -831,22 +822,17 @@
 
                  detailView.querySelectorAll('.remove-member-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
-                        const emailToRemove = btn.dataset.email;
+                        const uidToRemove = btn.dataset.uid;
+                        const emailToRemove = project.members[uidToRemove]?.email;
                         if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
                         
                         toggleButtonLoading(btn, true, '移除');
                         const projectRef = doc(db, "projects", projectId);
                         try {
-                           const projectSnap = await getDoc(projectRef);
-                           const members = projectSnap.data().members;
-                           const uidToRemove = Object.keys(members).find(uid => members[uid].email === emailToRemove);
-                           
-                           if(uidToRemove) {
-                                await updateDoc(projectRef, {
-                                    [`members.${uidToRemove}`]: deleteField()
-                                });
-                                alert('成員已移除');
-                           }
+                           await updateDoc(projectRef, {
+                               [`members.${uidToRemove}`]: deleteField()
+                           });
+                           alert('成員已移除');
                         } catch (error) {
                             alert('移除成員失敗: ' + error.message);
                             toggleButtonLoading(btn, false, '移除');
