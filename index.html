@@ -674,12 +674,32 @@
                     name: currentUser.name, 
                     avatar: currentUser.avatar 
                 }, 
-                date: new Date().toISOString() 
+                date: new Date().toISOString(),
+                version: 1,
+                isLatest: true
             };
             
             try {
-                await updateDoc(doc(db, "projects", projectId), { 
-                    [field]: arrayUnion(logEntry) 
+                // 先取得現有的檔案列表
+                const projectRef = doc(db, "projects", projectId);
+                const projectSnap = await getDoc(projectRef);
+                const projectData = projectSnap.data();
+                
+                // 取得現有檔案陣列
+                const existingFiles = field.split('.').reduce((obj, key) => obj?.[key], projectData) || [];
+                
+                // 將所有現有檔案標記為非最新版本
+                const updatedFiles = existingFiles.map(file => ({
+                    ...file,
+                    isLatest: false
+                }));
+                
+                // 新增新檔案到陣列開頭（置頂）
+                updatedFiles.unshift(logEntry);
+                
+                // 更新資料庫
+                await updateDoc(projectRef, { 
+                    [field]: updatedFiles 
                 });
                 console.log('檔案日誌新增成功:', logEntry);
             } catch (error) {
@@ -978,25 +998,25 @@
             switch(stepNum) {
                 case 1:
                     contentHTML = `<div class="space-y-4">
-                        <div><h5 class="font-bold text-gray-700">a. 文件*</h5>${renderLogList(project.briefingFiles?.documents, 'briefingFiles.documents', canEdit)}</div>
-                        <div><h5 class="font-bold text-gray-700">b. Logo (PNG)*</h5>${renderLogList(project.briefingFiles?.logos, 'briefingFiles.logos', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">a. 文件</h5>${renderLogList(project.briefingFiles?.documents, 'briefingFiles.documents', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">b. Logo (PNG)</h5>${renderLogList(project.briefingFiles?.logos, 'briefingFiles.logos', canEdit)}</div>
                         <div><h5 class="font-bold text-gray-700">c. 影片素材</h5>${renderLogList(project.briefingFiles?.videos, 'briefingFiles.videos', canEdit)}</div>
                       </div>
-                      ${renderAdminInput('input-briefing-doc', 'briefingFiles.documents', '新增文件連結...', true) +
-                        renderAdminInput('input-briefing-logo', 'briefingFiles.logos', '新增 Logo 連結...', true) +
+                      ${renderAdminInput('input-briefing-doc', 'briefingFiles.documents', '新增文件連結...') +
+                        renderAdminInput('input-briefing-logo', 'briefingFiles.logos', '新增 Logo 連結...') +
                         renderAdminInput('input-briefing-video', 'briefingFiles.videos', '新增影片連結...')}`;
                     break;
                 case 2:
                     contentHTML = `<div class="space-y-4">
-                        <div><h5 class="font-bold text-gray-700">Excel 文件 1*</h5>${renderLogList(project.aiFiles?.file1, 'aiFiles.file1', canEdit)}</div>
-                        <div><h5 class="font-bold text-gray-700">Excel 文件 2*</h5>${renderLogList(project.aiFiles?.file2, 'aiFiles.file2', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 1</h5>${renderLogList(project.aiFiles?.file1, 'aiFiles.file1', canEdit)}</div>
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 2</h5>${renderLogList(project.aiFiles?.file2, 'aiFiles.file2', canEdit)}</div>
                       </div>
-                      ${renderAdminInput('input-ai-1', 'aiFiles.file1', '新增文件 1 連結...', true) +
-                        renderAdminInput('input-ai-2', 'aiFiles.file2', '新增文件 2 連結...', true)}`;
+                      ${renderAdminInput('input-ai-1', 'aiFiles.file1', '新增文件 1 連結...') +
+                        renderAdminInput('input-ai-2', 'aiFiles.file2', '新增文件 2 連結...')}`;
                     break;
                 case 3:
-                     contentHTML = `<div><h5 class="font-bold text-gray-700">提案文件*</h5>${renderLogList(project.mediaProposals, 'mediaProposals', canEdit)}</div>
-                       ${renderAdminInput('input-media-proposal', 'mediaProposals', '新增提案連結...', true)}`;
+                     contentHTML = `<div><h5 class="font-bold text-gray-700">提案文件</h5>${renderLogList(project.mediaProposals, 'mediaProposals', canEdit)}</div>
+                       ${renderAdminInput('input-media-proposal', 'mediaProposals', '新增提案連結...')}`;
                     break;
                 case 4:
                     const link = project.brandCreative?.redirectLink || '';
@@ -1048,8 +1068,8 @@
                         </div>`;
                     break;
                 case 6:
-                    contentHTML = `<div><h5 class="font-bold text-gray-700">創意資料夾*</h5>${renderLogList(project.creativeFolder, 'creativeFolder', canEdit)}</div>
-                       ${renderAdminInput('input-creative-folder', 'creativeFolder', '新增資料夾連結...', true)}`;
+                    contentHTML = `<div><h5 class="font-bold text-gray-700">創意資料夾</h5>${renderLogList(project.creativeFolder, 'creativeFolder', canEdit)}</div>
+                       ${renderAdminInput('input-creative-folder', 'creativeFolder', '新增資料夾連結...')}`;
                     break;
                 case 7:
                     contentHTML = `
@@ -1075,6 +1095,12 @@
                                 ` : canEdit ? `
                                     <textarea id="final-report-results" class="w-full p-3 border rounded" rows="4" placeholder="請輸入專案成果...">${escapeHTML(finalReport.results || '')}</textarea>
                                 ` : '<p class="text-gray-500">尚未提交</p>'}
+                            </div>
+                            
+                            <div class="bg-gray-50 p-4 rounded-lg">
+                                <h5 class="font-bold text-gray-700 mb-3">結案報告連結</h5>
+                                ${renderLogList(finalReport.links, 'finalReport.links', canEdit)}
+                                ${canEdit ? renderAdminInput('input-final-report-links', 'finalReport.links', '新增結案報告連結...') : ''}
                             </div>
                             
                             <div class="bg-gray-50 p-4 rounded-lg">
@@ -1112,15 +1138,26 @@
 
         function renderLogList(logs = [], fieldPath = '', canEdit = false) {
             if (logs.length === 0) return '<p class="text-xs text-gray-500 px-2">尚無資料</p>';
-            return `<div class="space-y-2 mt-2">${logs.map((log, index) => `
-                <div class="log-item p-2 bg-gray-50 rounded-r-md flex items-center justify-between">
-                    <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all pr-4">${escapeHTML(log.link)}</a>
-                    <div class="flex items-center flex-shrink-0">
-                        <img src="${escapeHTML(log.user?.avatar)}" alt="${escapeHTML(log.user?.name)}" class="w-5 h-5 rounded-full mr-2">
-                        <span class="text-xs text-gray-500">由 ${escapeHTML(log.user?.name)} 於 ${toLocaleString(log.date)} 提供</span>
-                        ${canEdit ? `<button class="delete-log-btn ml-2 text-red-500 hover:text-red-700 text-xs font-bold" data-field="${fieldPath}" data-index="${index}" title="刪除此檔案">×</button>` : ''}
+            
+            return `<div class="space-y-2 mt-2">${logs.map((log, index) => {
+                const isLatest = log.isLatest !== false; // 預設為最新版本
+                const versionText = isLatest ? '最新版本' : `版本 ${log.version || 1}`;
+                const statusClass = isLatest ? 'bg-green-100 border-green-200' : 'bg-gray-50 border-gray-200';
+                const statusText = isLatest ? 'text-green-700' : 'text-gray-500';
+                
+                return `<div class="log-item p-3 rounded-lg border ${statusClass}">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-medium ${statusText}">${versionText}</span>
+                        <div class="flex items-center space-x-2">
+                            <img src="${escapeHTML(log.user?.avatar)}" alt="${escapeHTML(log.user?.name)}" class="w-4 h-4 rounded-full">
+                            <span class="text-xs text-gray-500">由 ${escapeHTML(log.user?.name)} 於 ${toLocaleString(log.date)} 提供</span>
+                            ${canEdit && isLatest ? `<button class="replace-file-btn ml-2 text-blue-500 hover:text-blue-700 text-xs font-bold" data-field="${fieldPath}" data-index="${index}" title="替換此檔案">替換</button>` : ''}
+                            ${canEdit ? `<button class="delete-log-btn ml-2 text-red-500 hover:text-red-700 text-xs font-bold" data-field="${fieldPath}" data-index="${index}" title="刪除此檔案">×</button>` : ''}
+                        </div>
                     </div>
-                </div>`).join('')}</div>`;
+                    <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all block">${escapeHTML(log.link)}</a>
+                </div>`;
+            }).join('')}</div>`;
         };
         
         function renderMemberManagement(project, canEdit) {
@@ -1684,6 +1721,25 @@
                     }
                 });
             });
+
+            // 替換檔案按鈕
+            detailView.querySelectorAll('.replace-file-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const fieldPath = btn.dataset.field;
+                    const index = parseInt(btn.dataset.index);
+                    
+                    // 建立替換對話框
+                    const newLink = prompt('請輸入新的檔案連結:');
+                    if (!newLink || !newLink.trim()) return;
+                    
+                    console.log('替換檔案:', fieldPath, '索引:', index, '新連結:', newLink);
+                    await replaceFileLog(projectId, fieldPath, newLink, index, btn);
+                });
+            });
         }
         
         // --- GLOBAL EVENT LISTENERS ---
@@ -1748,6 +1804,68 @@
             await deleteDoc(doc(db, "projects", projectId));
             backToProjectsList();
             UI.deleteConfirmModal.classList.add('hidden');
+        }
+
+        async function replaceFileLog(projectId, field, newLink, oldIndex, button) {
+            if (!newLink.trim()) {
+                alert('請輸入有效的連結');
+                return;
+            }
+            
+            console.log('開始替換檔案:', { projectId, field, newLink, oldIndex });
+            toggleButtonLoading(button, true, '替換中');
+            
+            try {
+                const projectRef = doc(db, "projects", projectId);
+                const projectSnap = await getDoc(projectRef);
+                const projectData = projectSnap.data();
+                
+                // 取得現有檔案陣列
+                const existingFiles = field.split('.').reduce((obj, key) => obj?.[key], projectData) || [];
+                
+                if (oldIndex >= existingFiles.length) {
+                    throw new Error('找不到要替換的檔案');
+                }
+                
+                const oldFile = existingFiles[oldIndex];
+                
+                // 建立新的檔案記錄
+                const newFileEntry = {
+                    link: newLink.trim(),
+                    user: {
+                        uid: currentUser.uid,
+                        email: currentUser.email,
+                        name: currentUser.name,
+                        avatar: currentUser.avatar
+                    },
+                    date: new Date().toISOString(),
+                    version: (oldFile.version || 1) + 1,
+                    isLatest: true,
+                    replacedFrom: oldFile.link // 記錄被替換的原始連結
+                };
+                
+                // 將所有現有檔案標記為非最新版本
+                const updatedFiles = existingFiles.map(file => ({
+                    ...file,
+                    isLatest: false
+                }));
+                
+                // 替換指定索引的檔案
+                updatedFiles[oldIndex] = newFileEntry;
+                
+                // 更新資料庫
+                await updateDoc(projectRef, {
+                    [field]: updatedFiles
+                });
+                
+                console.log('檔案替換成功:', newFileEntry);
+                alert('檔案已成功替換！');
+            } catch (error) {
+                console.error("替換檔案失敗:", error);
+                alert('替換失敗: ' + error.message);
+            } finally {
+                toggleButtonLoading(button, false, '替換');
+            }
         }
 
     </script>
