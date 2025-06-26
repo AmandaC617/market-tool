@@ -1758,7 +1758,18 @@
         }
         
         // --- GLOBAL EVENT LISTENERS ---
-        UI.googleLoginBtn.addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error));
+        UI.googleLoginBtn.addEventListener('click', async () => {
+            try {
+                await signInWithPopup(auth, new GoogleAuthProvider());
+            } catch (error) {
+                console.error('Google 登入失敗:', error);
+                if (error.code === 'auth/popup-closed-by-user') {
+                    console.log('使用者關閉了登入彈窗');
+                } else {
+                    alert('登入失敗: ' + error.message);
+                }
+            }
+        });
         UI.logoutBtn.addEventListener('click', () => signOut(auth));
         UI.newProjectBtn.addEventListener('click', () => openProjectModal());
         UI.projectForm.addEventListener('submit', handleProjectFormSubmit);
@@ -1883,6 +1894,32 @@
             }
         }
 
+        // --- GLOBAL ERROR HANDLERS ---
+        // 捕獲未處理的 Promise 錯誤
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('未處理的 Promise 錯誤:', event.reason);
+            console.error('錯誤詳情:', {
+                message: event.reason?.message,
+                stack: event.reason?.stack,
+                code: event.reason?.code
+            });
+            
+            // 防止錯誤顯示在控制台
+            event.preventDefault();
+        });
+
+        // 捕獲全域 JavaScript 錯誤
+        window.addEventListener('error', function(event) {
+            console.error('全域 JavaScript 錯誤:', {
+                message: event.message,
+                filename: event.filename,
+                lineno: event.lineno,
+                colno: event.colno,
+                error: event.error
+            });
+        });
+
+        // --- GLOBAL EVENT LISTENERS ---
     </script>
 </body>
 </html>
