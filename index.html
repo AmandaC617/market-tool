@@ -257,8 +257,8 @@
                 } else {
                     Object.assign(projectData, {
                         ownerId: currentUser.uid,
-                        members: [currentUser.uid],
-                        memberEmails: [currentUser.email], 
+                        members: [currentUser.uid], // Store UIDs in an Array
+                        memberEmails: [currentUser.email], // Keep this for display convenience
                         createdAt: serverTimestamp(),
                         completedSteps: [],
                         stepCompletionDates: {},
@@ -366,6 +366,7 @@
             if (projects.length === 0) {
                 UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
+            // *** MODIFIED: More robust sorting based on user feedback ***
             projects.sort((a, b) => {
                 const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
                 const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
@@ -545,7 +546,7 @@
             }
 
             const membersHTML = (project.memberEmails || []).map(email => {
-                 const memberUid = [...allUsersCache.entries()].find(([uid, data]) => data.email === email)?.[0];
+                 const memberUid = Array.from(allUsersCache.keys()).find(uid => allUsersCache.get(uid)?.email === email);
                  const memberData = allUsersCache.get(memberUid) || { avatar: '', name: '未知使用者' };
                 return `
                 <li class="flex items-center justify-between py-1">
@@ -617,12 +618,12 @@
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
             
+            // *** FIXED: Correct query for ARRAY data structure ***
             const q = isSuperAdmin(currentUser) 
                 ? query(projectsRef) 
                 : query(projectsRef, where("members", "array-contains", currentUser.uid));
             
             unsubscribeProjects = onSnapshot(q, snapshot => {
-                console.log('onSnapshot 回傳資料:', snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}))); // DEBUG
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderProjectsList(projects);
             }, error => {
