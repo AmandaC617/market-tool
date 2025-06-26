@@ -274,7 +274,6 @@
                         ]},
                         creativeFolder: []
                     });
-                    console.log('New project data to be saved:', projectData);
                     await addDoc(collection(db, "projects"), projectData);
                 }
                 UI.projectModal.classList.add('hidden');
@@ -369,7 +368,12 @@
             if (projects.length === 0) {
                 UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
-            projects.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
+            // *** MODIFIED: More robust sorting ***
+            projects.sort((a, b) => {
+                const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
+                const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+                return bTime - aTime;
+            });
             projects.forEach(project => {
                 const card = document.createElement('div');
                 card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
@@ -444,7 +448,6 @@
             
             UI.projectDetailView.innerHTML = detailHTML;
             
-            // Render content for each step
             for (let i = 1; i <= 6; i++) {
                 const contentDiv = UI.projectDetailView.querySelector(`#step-content-${i}`);
                 if(contentDiv) {
@@ -459,9 +462,7 @@
         }
         
         function renderStepContent(stepNum, project, canEdit) {
-            const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
             const isComplete = project.completedSteps?.includes(stepNum);
-
             const renderAdminInput = (inputId, fieldPath, placeholder) => canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}-${stepNum}"><button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button></div></div>` : '';
             
             let contentHTML = '';
@@ -623,6 +624,7 @@
             console.log("Listening for projects with query:", q); // DEBUG
             
             unsubscribeProjects = onSnapshot(q, snapshot => {
+                console.log('專案列表:', snapshot.docs.map(doc => doc.data())); // DEBUG
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderProjectsList(projects);
             }, error => {
@@ -889,4 +891,3 @@
     </script>
 </body>
 </html>
-
