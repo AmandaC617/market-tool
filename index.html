@@ -168,6 +168,12 @@
             confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
         };
 
+        // DEBUG: Check if essential UI elements are found
+        if (!UI.newProjectBtn || !UI.projectModal) {
+            console.error("CRITICAL ERROR: 'new-project-btn' or 'project-modal' not found in the DOM. Check your HTML IDs.");
+        }
+
+
         // --- Helper Functions ---
         const isSuperAdmin = (user) => user?.email === SUPER_ADMIN_EMAIL;
         const toLocaleString = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('zh-TW', { hour12: false }) : 'N/A';
@@ -175,6 +181,7 @@
         const escapeHTML = (str) => str ? str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match])) : '';
         
         function toggleButtonLoading(button, isLoading, originalText = '儲存') {
+            if (!button) return;
             if (isLoading) {
                 button.disabled = true;
                 button.innerHTML = `<span class="btn-spinner"></span>處理中...`;
@@ -267,6 +274,7 @@
                         ]},
                         creativeFolder: []
                     });
+                    console.log('New project data to be saved:', projectData);
                     await addDoc(collection(db, "projects"), projectData);
                 }
                 UI.projectModal.classList.add('hidden');
@@ -520,6 +528,18 @@
             return contentHTML;
         }
 
+        function renderLogList(logs = []) {
+            if (logs.length === 0) return '<p class="text-xs text-gray-500 px-2">尚無資料</p>';
+            return `<div class="space-y-2 mt-2">${logs.map(log => `
+                <div class="log-item p-2 bg-gray-50 rounded-r-md flex items-center justify-between">
+                    <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all pr-4">${escapeHTML(log.link)}</a>
+                    <div class="flex items-center flex-shrink-0">
+                        <img src="${escapeHTML(log.user?.avatar)}" alt="${escapeHTML(log.user?.name)}" class="w-5 h-5 rounded-full mr-2">
+                        <span class="text-xs text-gray-500">由 ${escapeHTML(log.user?.name)} 於 ${toLocaleString(log.date)} 提供</span>
+                    </div>
+                </div>`).join('')}</div>`;
+        };
+        
         function renderMemberManagement(project, canEdit) {
             const container = UI.projectDetailView.querySelector('#member-management-container');
             if (!container || !canEdit) return;
@@ -552,7 +572,6 @@
             if (!container) return;
 
             let activities = [];
-            // Gather log activities
             const logFields = {
                 'briefingFiles.documents': 'Briefing 文件', 'briefingFiles.logos': 'Briefing Logo', 'briefingFiles.videos': 'Briefing 影片',
                 'aiFiles.file1': 'AI 文件1', 'aiFiles.file2': 'AI 文件2', 'mediaProposals': '媒體提案', 'creativeFolder': '創意資料夾'
@@ -564,7 +583,6 @@
                     html: `<div class="activity-item p-2"><img src="${escapeHTML(log.user?.avatar)}" class="w-5 h-5 rounded-full inline-block mr-2"><span class="font-bold">${escapeHTML(log.user?.name)}</span> 新增了一筆 <span class="font-semibold">${name}</span> 記錄。<span class="text-gray-500 text-xs ml-2">${toLocaleString(log.date)}</span></div>`
                 }));
             }
-            // Sort by date and take the last 10
             activities.sort((a,b) => b.date - a.date);
             const recentActivities = activities.slice(0, 10);
             
@@ -580,8 +598,6 @@
             const previousState = lastKnownProjectState[project.id];
             if (!previousState) return; // First time loading, do nothing
 
-            // Compare logs
-            const logFields = ['briefingFiles.documents', 'briefingFiles.logos', 'briefingFiles.videos', 'aiFiles.file1', 'aiFiles.file2', 'mediaProposals', 'creativeFolder'];
             const logStepMapping = { 1: ['briefingFiles.documents', 'briefingFiles.logos', 'briefingFiles.videos'], 2: ['aiFiles.file1', 'aiFiles.file2'], 3: ['mediaProposals'], 6: ['creativeFolder'] };
             
             Object.entries(logStepMapping).forEach(([step, fields]) => {
@@ -598,14 +614,20 @@
         function listenForProjects() {
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
+            
+            // *** FIXED: Correct query for map data structure ***
             const q = isSuperAdmin(currentUser) 
                 ? query(projectsRef) 
                 : query(projectsRef, where(`members.${currentUser.uid}`, "!=", null));
             
+            console.log("Listening for projects with query:", q); // DEBUG
+            
             unsubscribeProjects = onSnapshot(q, snapshot => {
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderProjectsList(projects);
-            }, console.error);
+            }, error => {
+                console.error("Error listening for projects:", error);
+            });
         }
         
         function showProjectDetail(projectId) {
@@ -620,7 +642,6 @@
                     renderProjectDetail(projectData, canEdit);
                     lastKnownProjectState[projectId] = projectData; // Store state for comparison
                     
-                    // Listen to comments for all scripts in this project
                     (projectData.brandCreative?.scripts || []).forEach(script => {
                         listenForScriptComments(projectId, script.id);
                     });
@@ -644,18 +665,30 @@
                 
                 const container = document.getElementById(`comments-container-${scriptId}`);
                 if (!container) return;
-                container.innerHTML = ''; // Clear before re-rendering
-                renderScriptComments(comments, scriptId);
+                container.innerHTML = '';
+                
+                comments.forEach(comment => {
+                    const commentEl = document.createElement('div');
+                    commentEl.className = 'comment-item bg-blue-50 p-2 rounded-r-lg';
+                    commentEl.innerHTML = `
+                        <p class="text-sm">${escapeHTML(comment.text)}</p>
+                        <div class="text-xs text-gray-500 text-right mt-2 flex items-center justify-end">
+                            <img src="${escapeHTML(comment.author?.avatar)}" alt="${escapeHTML(comment.author?.name)}" class="w-4 h-4 rounded-full mr-1">
+                            <span>by ${escapeHTML(comment.author?.name)} at ${toLocaleString(comment.createdAt?.toDate())}</span>
+                        </div>`;
+                    container.appendChild(commentEl);
+                });
+                container.scrollTop = container.scrollHeight;
 
-                // Show new activity dot for step 5
                 const previousState = lastKnownProjectState[projectId];
-                const prevCommentCount = previousState?.comments?.[scriptId] || 0;
-                if(comments.length > prevCommentCount) {
-                    document.getElementById('new-activity-5')?.classList.remove('hidden');
+                if(previousState) {
+                    const prevCommentCount = previousState.comments?.[scriptId] || 0;
+                    if(comments.length > prevCommentCount) {
+                        document.getElementById('new-activity-5')?.classList.remove('hidden');
+                    }
+                    if(!previousState.comments) previousState.comments = {};
+                    previousState.comments[scriptId] = comments.length;
                 }
-                if(!previousState.comments) previousState.comments = {};
-                previousState.comments[scriptId] = comments.length;
-
             }, console.error);
         }
 
@@ -671,7 +704,7 @@
                 toggler.addEventListener('click', () => {
                     const stepNum = toggler.dataset.stepToggler;
                     const content = document.getElementById(`step-content-${stepNum}`);
-                    document.getElementById(`new-activity-${stepNum}`)?.classList.add('hidden'); // Hide dot on open
+                    document.getElementById(`new-activity-${stepNum}`)?.classList.add('hidden');
                     const icon = toggler.querySelector('svg');
                     content.style.maxHeight = (content.style.maxHeight && content.style.maxHeight !== '0px') ? '0px' : content.scrollHeight + 40 + "px";
                     icon.style.transform = (content.style.maxHeight !== '0px') ? 'rotate(180deg)' : 'rotate(0deg)';
@@ -798,7 +831,8 @@
                     btn.addEventListener('click', async () => {
                         const emailToRemove = btn.dataset.email;
                         if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
-
+                        
+                        toggleButtonLoading(btn, true, '移除');
                         const projectRef = doc(db, "projects", projectId);
                         try {
                            const projectSnap = await getDoc(projectRef);
@@ -813,6 +847,7 @@
                            }
                         } catch (error) {
                             alert('移除成員失敗: ' + error.message);
+                            toggleButtonLoading(btn, false, '移除');
                         }
                     });
                 });
@@ -854,3 +889,4 @@
     </script>
 </body>
 </html>
+
