@@ -984,6 +984,12 @@
         
         function renderStepContent(stepNum, project, canEdit) {
             const isComplete = project.completedSteps?.includes(stepNum);
+            
+            // 提前定義結案報告相關變數，避免作用域問題
+            const finalReport = project.finalReport || {};
+            const isReportSubmitted = finalReport.submittedBy;
+            const isReportApproved = finalReport.approvedBy;
+            
             const renderAdminInput = (inputId, fieldPath, placeholder, required = false) => canEdit ? `<div class="mt-4 pt-4 border-t border-dashed">
                 <div class="flex gap-2 items-center">
                     <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm ${required ? 'border-red-300' : ''}" id="${inputId}-${stepNum}" ${required ? 'required' : ''}>
@@ -1025,10 +1031,6 @@
                             ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input-id="input-brand-redirect">儲存</button></div></div>` : ''}`;
                     break;
                 case 5:
-                    const finalReport = project.finalReport || {};
-                    const isReportSubmitted = finalReport.submittedBy;
-                    const isReportApproved = finalReport.approvedBy;
-                    
                     contentHTML = `
                         <div class="space-y-6">
                             ${(project.brandCreative?.scripts || []).map(script => {
