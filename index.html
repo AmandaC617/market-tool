@@ -366,7 +366,6 @@
             if (projects.length === 0) {
                 UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
-            // *** MODIFIED: More robust sorting based on user feedback ***
             projects.sort((a, b) => {
                 const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
                 const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
@@ -540,10 +539,13 @@
         
         function renderMemberManagement(project, canEdit) {
             const container = UI.projectDetailView.querySelector('#member-management-container');
-            if (!container || !canEdit) return;
+            if (!container || !canEdit) {
+                if(container) container.innerHTML = ''; // Clear if not admin
+                return;
+            }
 
             const membersHTML = (project.memberEmails || []).map(email => {
-                 const memberUid = Array.from(allUsersCache.keys()).find(uid => allUsersCache.get(uid)?.email === email);
+                 const memberUid = [...allUsersCache.entries()].find(([uid, data]) => data.email === email)?.[0];
                  const memberData = allUsersCache.get(memberUid) || { avatar: '', name: '未知使用者' };
                 return `
                 <li class="flex items-center justify-between py-1">
@@ -615,12 +617,9 @@
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
             
-            // *** FIXED: Correct query for ARRAY data structure ***
             const q = isSuperAdmin(currentUser) 
                 ? query(projectsRef) 
                 : query(projectsRef, where("members", "array-contains", currentUser.uid));
-            
-            console.log("Listening for projects with query:", q); // DEBUG
             
             unsubscribeProjects = onSnapshot(q, snapshot => {
                 console.log('onSnapshot 回傳資料:', snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}))); // DEBUG
