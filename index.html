@@ -1253,9 +1253,11 @@
             unsubscribeProjectDetail = onSnapshot(projectRef, (doc) => {
                 if (doc.exists()) {
                     const projectData = { id: doc.id, ...doc.data() };
-                    const canEdit = isSuperAdmin(currentUser);
+                    // 修復權限檢查：超級管理員或專案擁有者都可以編輯
+                    const canEdit = isSuperAdmin(currentUser) || projectData.ownerId === currentUser?.uid;
                     console.log('專案詳情載入成功:', projectData.name, '可編輯:', canEdit);
                     console.log('專案擁有者:', projectData.ownerId, '當前使用者:', currentUser?.uid);
+                    console.log('是否為超級管理員:', isSuperAdmin(currentUser));
                     renderProjectDetail(projectData, canEdit);
                     lastKnownProjectState[projectId] = projectData; 
                     
@@ -1364,6 +1366,7 @@
                 console.log('刪除按鈕狀態:', deleteBtn ? '存在但無權限' : '不存在');
             }
 
+            // 步驟展開事件
             detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
                 console.log('綁定步驟展開事件:', toggler.dataset.stepToggler);
                 toggler.addEventListener('click', (e) => {
@@ -1404,6 +1407,7 @@
                 });
             });
 
+            // 腳本評論事件
             detailView.querySelectorAll('.add-script-comment-btn').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const scriptId = parseInt(btn.dataset.scriptId);
@@ -1413,208 +1417,273 @@
                 });
             });
             
-            if (canEdit) {
-                console.log('開始綁定編輯功能事件...');
-                
-                detailView.querySelectorAll('.add-log-btn').forEach(btn => {
-                    console.log('綁定新增檔案按鈕:', btn.dataset.field);
-                    btn.addEventListener('click', async () => {
-                        const inputId = btn.dataset.inputId;
-                        const input = detailView.querySelector(`#${inputId}`);
-                        if (input && input.value) {
-                            console.log('新增檔案連結:', input.value, '欄位:', btn.dataset.field, '輸入ID:', inputId);
-                            await addFileLog(projectId, btn.dataset.field, input.value, btn);
-                            input.value = '';
+            // 所有編輯功能事件（需要權限）
+            console.log('開始綁定編輯功能事件，可編輯:', canEdit);
+            
+            // 新增檔案按鈕
+            detailView.querySelectorAll('.add-log-btn').forEach(btn => {
+                console.log('綁定新增檔案按鈕:', btn.dataset.field);
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const inputId = btn.dataset.inputId;
+                    const input = detailView.querySelector(`#${inputId}`);
+                    if (input && input.value) {
+                        console.log('新增檔案連結:', input.value, '欄位:', btn.dataset.field, '輸入ID:', inputId);
+                        await addFileLog(projectId, btn.dataset.field, input.value, btn);
+                        input.value = '';
+                    } else {
+                        console.error('找不到輸入欄位或輸入為空:', inputId);
+                        if (input && input.hasAttribute('required')) {
+                            alert('此欄位為必填，請輸入檔案連結');
+                            input.focus();
                         } else {
-                            console.error('找不到輸入欄位或輸入為空:', inputId);
-                            if (input && input.hasAttribute('required')) {
-                                alert('此欄位為必填，請輸入檔案連結');
-                                input.focus();
-                            } else {
-                                alert('請輸入檔案連結');
-                            }
+                            alert('請輸入檔案連結');
                         }
-                    });
+                    }
                 });
+            });
 
-                detailView.querySelectorAll('.save-field-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
-                        toggleButtonLoading(btn, true, '儲存');
-                        try {
-                            await updateDoc(doc(db, "projects", projectId), { [btn.dataset.field]: input.value });
-                        } finally {
-                            toggleButtonLoading(btn, false, '儲存');
+            // 儲存欄位按鈕
+            detailView.querySelectorAll('.save-field-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                    toggleButtonLoading(btn, true, '儲存');
+                    try {
+                        await updateDoc(doc(db, "projects", projectId), { [btn.dataset.field]: input.value });
+                        console.log('欄位儲存成功:', btn.dataset.field);
+                    } catch (error) {
+                        console.error('儲存欄位失敗:', error);
+                        alert('儲存失敗: ' + error.message);
+                    } finally {
+                        toggleButtonLoading(btn, false, '儲存');
+                    }
+                });
+            });
+
+            // 儲存腳本按鈕
+            detailView.querySelectorAll('.save-script-btn').forEach(btn => {
+                console.log('綁定儲存腳本按鈕:', btn.dataset.scriptId);
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const scriptId = parseInt(btn.dataset.scriptId);
+                    const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
+                    console.log('儲存腳本:', scriptId, textarea?.value);
+                    toggleButtonLoading(btn, true, '儲存腳本');
+                    try {
+                        const projectSnap = await getDoc(doc(db, "projects", projectId));
+                        const scripts = projectSnap.data().brandCreative.scripts;
+                        const scriptIndex = scripts.findIndex(s => s.id === scriptId);
+                        if (scriptIndex > -1) {
+                            scripts[scriptIndex].text = textarea.value;
+                            await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
+                            console.log('腳本儲存成功');
                         }
-                    });
+                    } catch (error) {
+                        console.error('儲存腳本失敗:', error);
+                        alert('儲存腳本失敗: ' + error.message);
+                    } finally {
+                         toggleButtonLoading(btn, false, '儲存腳本');
+                    }
                 });
-
-                detailView.querySelectorAll('.save-script-btn').forEach(btn => {
-                    console.log('綁定儲存腳本按鈕:', btn.dataset.scriptId);
-                    btn.addEventListener('click', async () => {
-                        const scriptId = parseInt(btn.dataset.scriptId);
-                        const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
-                        console.log('儲存腳本:', scriptId, textarea?.value);
-                        toggleButtonLoading(btn, true, '儲存腳本');
-                        try {
-                            const projectSnap = await getDoc(doc(db, "projects", projectId));
-                            const scripts = projectSnap.data().brandCreative.scripts;
-                            const scriptIndex = scripts.findIndex(s => s.id === scriptId);
-                            if (scriptIndex > -1) {
-                                scripts[scriptIndex].text = textarea.value;
-                                await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
-                                console.log('腳本儲存成功');
-                            }
-                        } catch (error) {
-                            console.error('儲存腳本失敗:', error);
-                            alert('儲存腳本失敗: ' + error.message);
-                        } finally {
-                             toggleButtonLoading(btn, false, '儲存腳本');
-                        }
-                    });
+            });
+            
+            // 送審腳本按鈕
+            detailView.querySelectorAll('.submit-script-btn').forEach(btn => {
+                console.log('綁定送審腳本按鈕:', btn.dataset.scriptId);
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const scriptId = parseInt(btn.dataset.scriptId);
+                    const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
+                    if (!textarea.value.trim()) {
+                        alert('請先輸入腳本內容');
+                        return;
+                    }
+                    console.log('送審腳本:', scriptId);
+                    await submitScript(projectId, scriptId, btn);
                 });
-                
-                detailView.querySelectorAll('.submit-script-btn').forEach(btn => {
-                    console.log('綁定送審腳本按鈕:', btn.dataset.scriptId);
-                    btn.addEventListener('click', async () => {
-                        const scriptId = parseInt(btn.dataset.scriptId);
-                        const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
-                        if (!textarea.value.trim()) {
-                            alert('請先輸入腳本內容');
-                            return;
-                        }
-                        console.log('送審腳本:', scriptId);
-                        await submitScript(projectId, scriptId, btn);
-                    });
+            });
+            
+            // 核准腳本按鈕
+            detailView.querySelectorAll('.approve-script-btn').forEach(btn => {
+                console.log('綁定核准腳本按鈕:', btn.dataset.scriptId);
+                btn.addEventListener('click', () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    approveScript(projectId, parseInt(btn.dataset.scriptId), btn);
                 });
-                
-                detailView.querySelectorAll('.approve-script-btn').forEach(btn => {
-                    console.log('綁定核准腳本按鈕:', btn.dataset.scriptId);
-                    btn.addEventListener('click', () => approveScript(projectId, parseInt(btn.dataset.scriptId), btn));
+            });
+
+            // 提交結案報告按鈕
+            detailView.querySelectorAll('.submit-final-report-btn').forEach(btn => {
+                console.log('綁定提交結案報告按鈕');
+                btn.addEventListener('click', () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    submitFinalReport(projectId, btn);
                 });
-
-                detailView.querySelectorAll('.submit-final-report-btn').forEach(btn => {
-                    console.log('綁定提交結案報告按鈕');
-                    btn.addEventListener('click', () => submitFinalReport(projectId, btn));
+            });
+            
+            // 核准結案報告按鈕
+            detailView.querySelectorAll('.approve-final-report-btn').forEach(btn => {
+                console.log('綁定核准結案報告按鈕');
+                btn.addEventListener('click', () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    approveFinalReport(projectId, btn);
                 });
-                
-                detailView.querySelectorAll('.approve-final-report-btn').forEach(btn => {
-                    console.log('綁定核准結案報告按鈕');
-                    btn.addEventListener('click', () => approveFinalReport(projectId, btn));
+            });
+
+            // 切換步驟狀態按鈕
+            detailView.querySelectorAll('.toggle-step-btn').forEach(btn => {
+                console.log('綁定切換步驟狀態按鈕:', btn.dataset.step);
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const stepNum = parseInt(btn.dataset.step);
+                    toggleButtonLoading(btn, true, btn.textContent);
+                    try {
+                        const projectRef = doc(db, "projects", projectId);
+                        const projectSnap = await getDoc(projectRef);
+                        const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
+                        await updateDoc(projectRef, {
+                            completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
+                            [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
+                        });
+                        console.log('步驟狀態切換成功:', stepNum, isComplete ? '標記為未完成' : '標記為完成');
+                    } catch (error) {
+                        console.error('切換步驟狀態失敗:', error);
+                        alert('切換步驟狀態失敗: ' + error.message);
+                    } finally {
+                        toggleButtonLoading(btn, false, btn.textContent);
+                    }
                 });
+            });
 
-                detailView.querySelectorAll('.toggle-step-btn').forEach(btn => {
-                    console.log('綁定切換步驟狀態按鈕:', btn.dataset.step);
-                    btn.addEventListener('click', async () => {
-                        const stepNum = parseInt(btn.dataset.step);
-                        toggleButtonLoading(btn, true, btn.textContent);
-                        try {
-                            const projectRef = doc(db, "projects", projectId);
-                            const projectSnap = await getDoc(projectRef);
-                            const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
-                            await updateDoc(projectRef, {
-                                completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
-                                [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
-                            });
-                        } catch (error) {
-                            console.error('切換步驟狀態失敗:', error);
-                            alert('切換步驟狀態失敗: ' + error.message);
-                        } finally {
-                            toggleButtonLoading(btn, false, btn.textContent);
-                        }
-                    });
-                });
-
-                const addMemberBtn = detailView.querySelector('#add-member-btn');
-                if (addMemberBtn) {
-                    addMemberBtn.addEventListener('click', async () => {
-                        const emailInput = detailView.querySelector('#add-member-email');
-                        const email = emailInput.value.trim();
-                        if (!email) return alert('請輸入 Email');
-                        toggleButtonLoading(addMemberBtn, true, '新增成員');
-                        try {
-                            const usersRef = collection(db, "users");
-                            const q = query(usersRef, where("email", "==", email));
-                            const querySnapshot = await getDocs(q);
-                            
-                            if (querySnapshot.empty) throw new Error(`找不到 Email 為 ${email} 的使用者。請確認該使用者已用 Google 登入過一次系統。`);
-
-                            const userDoc = querySnapshot.docs[0];
-                            const newMemberUid = userDoc.id;
-
-                            const projectRef = doc(db, "projects", projectId);
-                            await updateDoc(projectRef, {
-                                members: arrayUnion(newMemberUid),
-                                memberEmails: arrayUnion(email)
-                            });
-                            emailInput.value = '';
-                            alert(`已成功新增成員 ${email}`);
-                        } catch (error) {
-                            alert(error.message);
-                        } finally {
-                            toggleButtonLoading(addMemberBtn, false, '新增成員');
-                        }
-                    });
-                }
-
-                 detailView.querySelectorAll('.remove-member-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        const emailToRemove = btn.dataset.email;
-                        if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
+            // 成員管理功能
+            const addMemberBtn = detailView.querySelector('#add-member-btn');
+            if (addMemberBtn) {
+                addMemberBtn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const emailInput = detailView.querySelector('#add-member-email');
+                    const email = emailInput.value.trim();
+                    if (!email) return alert('請輸入 Email');
+                    toggleButtonLoading(addMemberBtn, true, '新增成員');
+                    try {
+                        const usersRef = collection(db, "users");
+                        const q = query(usersRef, where("email", "==", email));
+                        const querySnapshot = await getDocs(q);
                         
-                        toggleButtonLoading(btn, true, '移除');
-                        try {
-                           const projectRef = doc(db, "projects", projectId);
-                           const usersRef = collection(db, "users");
-                           const q = query(usersRef, where("email", "==", emailToRemove));
-                           const userSnapshot = await getDocs(q);
+                        if (querySnapshot.empty) throw new Error(`找不到 Email 為 ${email} 的使用者。請確認該使用者已用 Google 登入過一次系統。`);
 
-                           if (userSnapshot.empty) throw new Error("找不到要移除的使用者");
-                           
-                           const uidToRemove = userSnapshot.docs[0].id;
-                           await updateDoc(projectRef, {
-                                members: arrayRemove(uidToRemove),
-                                memberEmails: arrayRemove(emailToRemove)
-                           });
-                           alert('成員已移除');
-                        } catch (error) {
-                            alert('移除成員失敗: ' + error.message);
-                            toggleButtonLoading(btn, false, '移除');
-                        }
-                    });
-                });
+                        const userDoc = querySnapshot.docs[0];
+                        const newMemberUid = userDoc.id;
 
-                detailView.querySelectorAll('.delete-log-btn').forEach(btn => {
-                    btn.addEventListener('click', async () => {
-                        const fieldPath = btn.dataset.field;
-                        const index = parseInt(btn.dataset.index);
-                        
-                        if (!confirm('確定要刪除此檔案嗎？')) return;
-                        
-                        console.log('刪除檔案:', fieldPath, '索引:', index);
-                        toggleButtonLoading(btn, true, '刪除中');
-                        
-                        try {
-                            const projectRef = doc(db, "projects", projectId);
-                            const projectSnap = await getDoc(projectRef);
-                            const projectData = projectSnap.data();
-                            
-                            // 根據欄位路徑取得陣列
-                            const fieldArray = fieldPath.split('.').reduce((obj, key) => obj?.[key], projectData) || [];
-                            const updatedArray = fieldArray.filter((_, i) => i !== index);
-                            
-                            // 更新資料庫
-                            await updateDoc(projectRef, { [fieldPath]: updatedArray });
-                            console.log('檔案刪除成功');
-                        } catch (error) {
-                            console.error('刪除檔案失敗:', error);
-                            alert('刪除檔案失敗: ' + error.message);
-                        } finally {
-                            toggleButtonLoading(btn, false, '×');
-                        }
-                    });
+                        const projectRef = doc(db, "projects", projectId);
+                        await updateDoc(projectRef, {
+                            members: arrayUnion(newMemberUid),
+                            memberEmails: arrayUnion(email)
+                        });
+                        emailInput.value = '';
+                        alert(`已成功新增成員 ${email}`);
+                    } catch (error) {
+                        alert(error.message);
+                    } finally {
+                        toggleButtonLoading(addMemberBtn, false, '新增成員');
+                    }
                 });
             }
+
+            // 移除成員按鈕
+            detailView.querySelectorAll('.remove-member-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const emailToRemove = btn.dataset.email;
+                    if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
+                    
+                    toggleButtonLoading(btn, true, '移除');
+                    try {
+                       const projectRef = doc(db, "projects", projectId);
+                       const usersRef = collection(db, "users");
+                       const q = query(usersRef, where("email", "==", emailToRemove));
+                       const userSnapshot = await getDocs(q);
+
+                       if (userSnapshot.empty) throw new Error("找不到要移除的使用者");
+                       
+                       const uidToRemove = userSnapshot.docs[0].id;
+                       await updateDoc(projectRef, {
+                            members: arrayRemove(uidToRemove),
+                            memberEmails: arrayRemove(emailToRemove)
+                       });
+                       alert('成員已移除');
+                    } catch (error) {
+                        alert('移除成員失敗: ' + error.message);
+                        toggleButtonLoading(btn, false, '移除');
+                    }
+                });
+            });
+
+            // 刪除檔案按鈕
+            detailView.querySelectorAll('.delete-log-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    const fieldPath = btn.dataset.field;
+                    const index = parseInt(btn.dataset.index);
+                    
+                    if (!confirm('確定要刪除此檔案嗎？')) return;
+                    
+                    console.log('刪除檔案:', fieldPath, '索引:', index);
+                    toggleButtonLoading(btn, true, '刪除中');
+                    
+                    try {
+                        const projectRef = doc(db, "projects", projectId);
+                        const projectSnap = await getDoc(projectRef);
+                        const projectData = projectSnap.data();
+                        
+                        // 根據欄位路徑取得陣列
+                        const fieldArray = fieldPath.split('.').reduce((obj, key) => obj?.[key], projectData) || [];
+                        const updatedArray = fieldArray.filter((_, i) => i !== index);
+                        
+                        // 更新資料庫
+                        await updateDoc(projectRef, { [fieldPath]: updatedArray });
+                        console.log('檔案刪除成功');
+                    } catch (error) {
+                        console.error('刪除檔案失敗:', error);
+                        alert('刪除檔案失敗: ' + error.message);
+                    } finally {
+                        toggleButtonLoading(btn, false, '×');
+                    }
+                });
+            });
         }
         
         // --- GLOBAL EVENT LISTENERS ---
