@@ -23,7 +23,6 @@
         .skeleton { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; background-color: #e5e7eb; border-radius: 0.25rem; }
         @keyframes pulse { 50% { opacity: .5; } }
         .step-content { max-height: 0; overflow: hidden; transition: max-height 0.7s ease-in-out; }
-        /* NEW: Visual Cue for new activity */
         .new-activity-dot {
             height: 8px; width: 8px; background-color: #ef4444; border-radius: 50%;
             animation: pulse-red 2s infinite;
@@ -175,7 +174,6 @@
         const toLocaleDateString = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('zh-TW') : 'N/A';
         const escapeHTML = (str) => str ? str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match])) : '';
         
-        // *** NEW: Button loading state helper ***
         function toggleButtonLoading(button, isLoading, originalText = '儲存') {
             if (isLoading) {
                 button.disabled = true;
@@ -248,13 +246,12 @@
                 } else {
                     Object.assign(projectData, {
                         ownerId: currentUser.uid,
-                        // *** MODIFIED: Use Map for members ***
                         members: {
                             [currentUser.uid]: {
                                 email: currentUser.email,
                                 name: currentUser.name,
                                 avatar: currentUser.avatar,
-                                role: 'manager' // Creator is manager by default
+                                role: 'manager'
                             }
                         },
                         createdAt: serverTimestamp(),
@@ -355,8 +352,6 @@
             } catch(error) {
                 console.error("審核失敗:", error);
                 alert("審核失敗: " + error.message);
-            } finally {
-                // The button will disappear on re-render, so no need to toggle loading off.
             }
         }
         
@@ -419,81 +414,443 @@
                     <div id="activity-feed-container" class="mt-8"></div>
                     <div id="member-management-container" class="mt-8"></div>
                 </div>
-                <div id="steps-container" class="space-y-6">${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project, canEdit)).join('')}</div>`;
+                <div id="steps-container" class="space-y-6">
+                    ${[1,2,3,4,5,6].map(stepNum => {
+                        const isComplete = project.completedSteps?.includes(stepNum);
+                        const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
+                        return `
+                            <div id="step-card-${stepNum}" class="step-item ${isComplete ? 'step-complete' : 'step-pending'} border-2 rounded-lg p-6 bg-white">
+                                <div class="flex justify-between items-center cursor-pointer" data-step-toggler="${stepNum}">
+                                    <h3 class="text-xl font-bold flex items-center gap-2">${stepNum}. ${stepTitles[stepNum-1]} <div id="new-activity-${stepNum}" class="hidden new-activity-dot"></div></h3>
+                                    <div class="flex items-center gap-4">
+                                       ${isComplete ? `<span class="text-sm text-green-700 font-medium">完成于: ${toLocaleDateString(project.stepCompletionDates?.[stepNum])}</span>` : `<span class="text-sm text-gray-500">待辦</span>`}
+                                       <svg class="w-6 h-6 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                                    </div>
+                                </div>
+                                <div id="step-content-${stepNum}" class="step-content mt-4 pt-4 border-t border-gray-200">
+                                    <!-- Content will be rendered by renderStepContent -->
+                                </div>
+                            </div>`;
+                    }).join('')}
+                </div>`;
             
             UI.projectDetailView.innerHTML = detailHTML;
             
+            // Render content for each step
+            for (let i = 1; i <= 6; i++) {
+                const contentDiv = UI.projectDetailView.querySelector(`#step-content-${i}`);
+                if(contentDiv) {
+                    contentDiv.innerHTML = renderStepContent(i, project, canEdit);
+                }
+            }
+
             renderMemberManagement(project, canEdit);
             renderActivityFeed(project);
             bindDetailViewEvents(project, canEdit);
+            checkForNewActivity(project);
         }
         
-        const renderLogList = (logs = [], members) => {
-            if (logs.length === 0) return '<p class="text-xs text-gray-500 px-2">尚無資料</p>';
-            return `<div class="space-y-2 mt-2">${logs.map(log => `
-                <div class="log-item p-2 bg-gray-50 rounded-r-md flex items-center justify-between">
-                    <a href="${escapeHTML(log.link)}" target="_blank" class="text-sm text-blue-600 hover:underline break-all pr-4">${escapeHTML(log.link)}</a>
-                    <div class="flex items-center flex-shrink-0">
-                        <img src="${escapeHTML(log.user?.avatar)}" alt="${escapeHTML(log.user?.name)}" class="w-5 h-5 rounded-full mr-2">
-                        <span class="text-xs text-gray-500">由 ${escapeHTML(log.user?.name)} 於 ${toLocaleString(log.date)} 提供</span>
-                    </div>
-                </div>`).join('')}</div>`;
-        };
-        
-        function renderScriptComments(comments) {
-            comments.forEach(comment => {
-                const container = document.getElementById(`comments-container-${comment.scriptId}`);
-                if (!container) return;
-                const commentEl = document.createElement('div');
-                commentEl.className = 'comment-item bg-blue-50 p-2 rounded-r-lg';
-                commentEl.innerHTML = `
-                    <p class="text-sm">${escapeHTML(comment.text)}</p>
-                    <div class="text-xs text-gray-500 text-right mt-2 flex items-center justify-end">
-                        <img src="${escapeHTML(comment.author?.avatar)}" alt="${escapeHTML(comment.author?.name)}" class="w-4 h-4 rounded-full mr-1">
-                        <span>by ${escapeHTML(comment.author?.name)} at ${toLocaleString(comment.createdAt?.toDate())}</span>
-                    </div>`;
-                container.appendChild(commentEl);
-                container.scrollTop = container.scrollHeight;
-            });
-        }
-        
-        function renderStepCard(stepNum, project, canEdit) {
+        function renderStepContent(stepNum, project, canEdit) {
             const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
             const isComplete = project.completedSteps?.includes(stepNum);
 
             const renderAdminInput = (inputId, fieldPath, placeholder) => canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}-${stepNum}"><button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button></div></div>` : '';
-            const renderStepContent = () => { /* ... (Same as before) ... */ };
             
-            return `
-                <div id="step-card-${stepNum}" class="step-item ${isComplete ? 'step-complete' : 'step-pending'} border-2 rounded-lg p-6 bg-white">
-                    <div class="flex justify-between items-center cursor-pointer" data-step-toggler="${stepNum}">
-                        <h3 class="text-xl font-bold flex items-center gap-2">${stepNum}. ${stepTitles[stepNum-1]} <div id="new-activity-${stepNum}" class="hidden new-activity-dot"></div></h3>
-                        <div class="flex items-center gap-4">
-                           ${isComplete ? `<span class="text-sm text-green-700 font-medium">完成于: ${toLocaleDateString(project.stepCompletionDates?.[stepNum])}</span>` : `<span class="text-sm text-gray-500">待辦</span>`}
-                           <svg class="w-6 h-6 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
-                        </div>
+            let contentHTML = '';
+            switch(stepNum) {
+                case 1:
+                    contentHTML = `<div class="space-y-4">
+                        <div><h5 class="font-bold text-gray-700">a. 文件</h5>${renderLogList(project.briefingFiles?.documents)}</div>
+                        <div><h5 class="font-bold text-gray-700">b. Logo (PNG)</h5>${renderLogList(project.briefingFiles?.logos)}</div>
+                        <div><h5 class="font-bold text-gray-700">c. 影片素材</h5>${renderLogList(project.briefingFiles?.videos)}</div>
+                      </div>
+                      ${renderAdminInput('input-briefing-doc', 'briefingFiles.documents', '新增文件連結...') +
+                        renderAdminInput('input-briefing-logo', 'briefingFiles.logos', '新增 Logo 連結...') +
+                        renderAdminInput('input-briefing-video', 'briefingFiles.videos', '新增影片連結...')}`;
+                    break;
+                case 2:
+                    contentHTML = `<div class="space-y-4">
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 1</h5>${renderLogList(project.aiFiles?.file1)}</div>
+                        <div><h5 class="font-bold text-gray-700">Excel 文件 2</h5>${renderLogList(project.aiFiles?.file2)}</div>
+                      </div>
+                      ${renderAdminInput('input-ai-1', 'aiFiles.file1', '新增文件 1 連結...') +
+                        renderAdminInput('input-ai-2', 'aiFiles.file2', '新增文件 2 連結...')}`;
+                    break;
+                case 3:
+                     contentHTML = `<div><h5 class="font-bold text-gray-700">提案文件</h5>${renderLogList(project.mediaProposals)}</div>
+                       ${renderAdminInput('input-media-proposal', 'mediaProposals', '新增提案連結...')}`;
+                    break;
+                case 4:
+                    const link = project.brandCreative?.redirectLink || '';
+                    contentHTML = `<div><h5 class="font-bold text-gray-700">跳轉頁面路徑</h5>
+                            <p class="text-sm text-blue-600 break-all p-2 bg-gray-50 rounded">${link ? `<a href="${link}" target="_blank">${escapeHTML(link)}</a>` : '未提供'}</p></div>
+                            ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input-id="input-brand-redirect">儲存</button></div></div>` : ''}`;
+                    break;
+                case 5:
+                    contentHTML = `<div class="space-y-6">
+                        ${(project.brandCreative?.scripts || []).map(script => {
+                            const isApproved = script.status === 'approved';
+                            return `<div class="p-4 rounded-lg border ${isApproved ? 'script-approved' : 'bg-white'}">
+                                <h5 class="font-bold text-gray-800">腳本 ${script.id} ${isApproved ? `<span class="text-green-600 font-bold">(已核准)</span>` : ''}</h5>
+                                ${isApproved ? `<div class="text-xs text-gray-600 bg-green-100 p-2 rounded mt-2">
+                                    <p class="whitespace-pre-wrap break-words">${escapeHTML(script.text) || '無內容'}</p>
+                                    <p class="text-right mt-2 pt-2 border-t border-green-200">由 <strong>${escapeHTML(script.approvedBy?.name)}</strong> 於 ${toLocaleString(script.approvalDate)} 核准</p>
+                                </div>` : `<textarea class="w-full mt-2 p-2 border rounded" rows="4" data-script-id="${script.id}">${escapeHTML(script.text)}</textarea>
+                                ${canEdit ? `<button class="save-script-btn text-xs bg-gray-200 px-2 py-1 rounded mt-1 hover:bg-gray-300" data-script-id="${script.id}">儲存腳本</button>` : ''}`}
+                                
+                                <div class="mt-4">
+                                    <h6 class="text-sm font-semibold">意見區</h6>
+                                    <div id="comments-container-${script.id}" class="space-y-2 mt-2 max-h-40 overflow-y-auto pr-1 text-sm"></div>
+                                    ${!isApproved ? `<div class="flex gap-2 mt-2"><input id="comment-input-${script.id}" type="text" placeholder="輸入意見..." class="flex-grow p-1 border rounded text-sm"><button class="add-script-comment-btn bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600" data-script-id="${script.id}">送出</button></div>` : ''}
+                                </div>
+                                ${canEdit && !isApproved ? `<div class="text-right mt-4"><button class="approve-script-btn bg-green-600 text-white py-1 px-3 rounded text-sm hover:bg-green-700" data-script-id="${script.id}">審查通過此腳本</button></div>` : ''}
+                            </div>`
+                        }).join('')}
+                    </div>`;
+                    break;
+                case 6:
+                    contentHTML = `<div><h5 class="font-bold text-gray-700">創意資料夾</h5>${renderLogList(project.creativeFolder)}</div>
+                       ${renderAdminInput('input-creative-folder', 'creativeFolder', '新增資料夾連結...')}`;
+                    break;
+            }
+
+            if (canEdit) {
+                contentHTML += `<div class="mt-6 text-right"><button class="toggle-step-btn ${isComplete ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white py-2 px-4 rounded-md" data-step="${stepNum}">${isComplete ? '標記為未完成' : '標記為完成'}</button></div>`;
+            }
+            return contentHTML;
+        }
+
+        function renderMemberManagement(project, canEdit) {
+            const container = UI.projectDetailView.querySelector('#member-management-container');
+            if (!container || !canEdit) return;
+
+            const membersHTML = Object.values(project.members || {}).map(member => `
+                <li class="flex items-center justify-between py-1">
+                    <div class="flex items-center">
+                        <img src="${escapeHTML(member.avatar)}" alt="${escapeHTML(member.name)}" class="w-6 h-6 rounded-full mr-2">
+                        <span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span>
+                        <span class="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">${member.role || 'member'}</span>
                     </div>
-                    <div id="step-content-${stepNum}" class="step-content mt-4 pt-4 border-t border-gray-200">
-                        <!-- Content will be rendered here based on stepNum -->
+                    ${member.email !== SUPER_ADMIN_EMAIL ? `<button class="remove-member-btn text-red-500 hover:text-red-700 text-xs font-bold" data-email="${escapeHTML(member.email)}">移除</button>` : ''}
+                </li>
+            `).join('');
+
+            container.innerHTML = `
+                <h4 class="text-lg font-semibold text-gray-800">成員管理</h4>
+                <div class="mt-2 p-4 bg-gray-50 rounded-lg">
+                    <p class="font-bold">現有成員:</p>
+                    <ul class="text-sm text-gray-700 mt-2 mb-4 divide-y divide-gray-200">${membersHTML}</ul>
+                    <div class="flex gap-2 items-center">
+                        <input type="email" id="add-member-email" placeholder="輸入成員 Email..." class="flex-grow p-1 border rounded text-sm">
+                        <button id="add-member-btn" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600 flex items-center justify-center">新增成員</button>
                     </div>
                 </div>`;
         }
 
-        // *** All NEW functions for Members, Activity Feed, and Visual Cues ***
-        function renderMemberManagement(project, canEdit) { /* ... */ }
-        function renderActivityFeed(project) { /* ... */ }
-        function checkForNewActivity(project) { /* ... */ }
+        function renderActivityFeed(project) {
+            const container = UI.projectDetailView.querySelector('#activity-feed-container');
+            if (!container) return;
+
+            let activities = [];
+            // Gather log activities
+            const logFields = {
+                'briefingFiles.documents': 'Briefing 文件', 'briefingFiles.logos': 'Briefing Logo', 'briefingFiles.videos': 'Briefing 影片',
+                'aiFiles.file1': 'AI 文件1', 'aiFiles.file2': 'AI 文件2', 'mediaProposals': '媒體提案', 'creativeFolder': '創意資料夾'
+            };
+            for (const [field, name] of Object.entries(logFields)) {
+                const logs = field.split('.').reduce((o, i) => o?.[i], project) || [];
+                logs.forEach(log => activities.push({
+                    date: new Date(log.date),
+                    html: `<div class="activity-item p-2"><img src="${escapeHTML(log.user?.avatar)}" class="w-5 h-5 rounded-full inline-block mr-2"><span class="font-bold">${escapeHTML(log.user?.name)}</span> 新增了一筆 <span class="font-semibold">${name}</span> 記錄。<span class="text-gray-500 text-xs ml-2">${toLocaleString(log.date)}</span></div>`
+                }));
+            }
+            // Sort by date and take the last 10
+            activities.sort((a,b) => b.date - a.date);
+            const recentActivities = activities.slice(0, 10);
+            
+            container.innerHTML = `
+                 <h4 class="text-lg font-semibold text-gray-800">最新動態</h4>
+                 <div class="mt-2 p-4 bg-gray-50 rounded-lg space-y-2 text-sm">
+                    ${recentActivities.length > 0 ? recentActivities.map(a => a.html).join('') : '<p class="text-gray-500">尚無動態</p>'}
+                 </div>
+            `;
+        }
+
+        function checkForNewActivity(project) {
+            const previousState = lastKnownProjectState[project.id];
+            if (!previousState) return; // First time loading, do nothing
+
+            // Compare logs
+            const logFields = ['briefingFiles.documents', 'briefingFiles.logos', 'briefingFiles.videos', 'aiFiles.file1', 'aiFiles.file2', 'mediaProposals', 'creativeFolder'];
+            const logStepMapping = { 1: ['briefingFiles.documents', 'briefingFiles.logos', 'briefingFiles.videos'], 2: ['aiFiles.file1', 'aiFiles.file2'], 3: ['mediaProposals'], 6: ['creativeFolder'] };
+            
+            Object.entries(logStepMapping).forEach(([step, fields]) => {
+                const currentCount = fields.reduce((sum, field) => sum + (field.split('.').reduce((o, i) => o?.[i], project) || []).length, 0);
+                const prevCount = fields.reduce((sum, field) => sum + (field.split('.').reduce((o, i) => o?.[i], previousState) || []).length, 0);
+                if (currentCount > prevCount) {
+                    document.getElementById(`new-activity-${step}`)?.classList.remove('hidden');
+                }
+            });
+        }
+
 
         // --- FIRESTORE LISTENERS ---
-        function listenForProjects() { /* ... */ }
-        function showProjectDetail(projectId) { /* ... */ }
-        function listenForScriptComments(projectId, scriptId) { /* ... */ }
-
-        // *** NEW: Centralized event binding function ***
-        function bindDetailViewEvents(project, canEdit) { /* ... */ }
+        function listenForProjects() {
+            if (unsubscribeProjects) unsubscribeProjects();
+            const projectsRef = collection(db, "projects");
+            const q = isSuperAdmin(currentUser) 
+                ? query(projectsRef) 
+                : query(projectsRef, where(`members.${currentUser.uid}`, "!=", null));
+            
+            unsubscribeProjects = onSnapshot(q, snapshot => {
+                const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderProjectsList(projects);
+            }, console.error);
+        }
         
-        // --- GLOBAL EVENT LISTENERS (for modals, etc.) ---
-        // ... (Same as before) ...
+        function showProjectDetail(projectId) {
+            UI.projectsView.classList.add('hidden');
+            UI.projectDetailView.classList.remove('hidden');
+            if (unsubscribeProjectDetail) unsubscribeProjectDetail();
+            const projectRef = doc(db, "projects", projectId);
+            unsubscribeProjectDetail = onSnapshot(projectRef, (doc) => {
+                if (doc.exists()) {
+                    const projectData = { id: doc.id, ...doc.data() };
+                    const canEdit = isSuperAdmin(currentUser);
+                    renderProjectDetail(projectData, canEdit);
+                    lastKnownProjectState[projectId] = projectData; // Store state for comparison
+                    
+                    // Listen to comments for all scripts in this project
+                    (projectData.brandCreative?.scripts || []).forEach(script => {
+                        listenForScriptComments(projectId, script.id);
+                    });
+                } else {
+                    console.log("Project not found, returning to list.");
+                    backToProjectsList();
+                }
+            }, console.error);
+        }
+
+        function listenForScriptComments(projectId, scriptId) {
+            const commentListenerId = `comments-${scriptId}`;
+            if (unsubscribeComments[commentListenerId]) unsubscribeComments[commentListenerId]();
+            
+            const commentsRef = collection(db, "projects", projectId, "scriptComments");
+            const q = query(commentsRef, where("scriptId", "==", scriptId));
+            
+            unsubscribeComments[commentListenerId] = onSnapshot(q, (snapshot) => {
+                const comments = snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+                comments.sort((a,b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+                
+                const container = document.getElementById(`comments-container-${scriptId}`);
+                if (!container) return;
+                container.innerHTML = ''; // Clear before re-rendering
+                renderScriptComments(comments, scriptId);
+
+                // Show new activity dot for step 5
+                const previousState = lastKnownProjectState[projectId];
+                const prevCommentCount = previousState?.comments?.[scriptId] || 0;
+                if(comments.length > prevCommentCount) {
+                    document.getElementById('new-activity-5')?.classList.remove('hidden');
+                }
+                if(!previousState.comments) previousState.comments = {};
+                previousState.comments[scriptId] = comments.length;
+
+            }, console.error);
+        }
+
+        // *** REFACTORED: Centralized event binding function ***
+        function bindDetailViewEvents(project, canEdit) {
+            const projectId = project.id;
+            const detailView = UI.projectDetailView;
+
+            detailView.querySelector('#back-to-projects-btn').addEventListener('click', backToProjectsList);
+            // ... export button logic ...
+            
+            detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
+                toggler.addEventListener('click', () => {
+                    const stepNum = toggler.dataset.stepToggler;
+                    const content = document.getElementById(`step-content-${stepNum}`);
+                    document.getElementById(`new-activity-${stepNum}`)?.classList.add('hidden'); // Hide dot on open
+                    const icon = toggler.querySelector('svg');
+                    content.style.maxHeight = (content.style.maxHeight && content.style.maxHeight !== '0px') ? '0px' : content.scrollHeight + 40 + "px";
+                    icon.style.transform = (content.style.maxHeight !== '0px') ? 'rotate(180deg)' : 'rotate(0deg)';
+                });
+            });
+
+            detailView.querySelectorAll('.add-script-comment-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const scriptId = parseInt(btn.dataset.scriptId);
+                    const input = detailView.querySelector(`#comment-input-${scriptId}`);
+                    await addScriptComment(projectId, scriptId, input.value, btn);
+                    input.value = '';
+                });
+            });
+            
+            if (canEdit) {
+                detailView.querySelector('#edit-project-btn')?.addEventListener('click', () => openProjectModal(project));
+                detailView.querySelector('#delete-project-btn')?.addEventListener('click', () => {
+                    UI.deleteConfirmModal.classList.remove('hidden');
+                    UI.confirmDeleteBtn.onclick = () => handleDeleteProject(projectId);
+                });
+
+                detailView.querySelectorAll('.add-log-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                        if (input && input.value) {
+                            await addFileLog(projectId, btn.dataset.field, input.value, btn);
+                            input.value = '';
+                        }
+                    });
+                });
+
+                detailView.querySelectorAll('.save-field-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                        toggleButtonLoading(btn, true, '儲存');
+                        try {
+                            await updateDoc(doc(db, "projects", projectId), { [btn.dataset.field]: input.value });
+                        } finally {
+                            toggleButtonLoading(btn, false, '儲存');
+                        }
+                    });
+                });
+
+                detailView.querySelectorAll('.save-script-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const scriptId = parseInt(btn.dataset.scriptId);
+                        const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
+                        toggleButtonLoading(btn, true, '儲存腳本');
+                        try {
+                            const projectSnap = await getDoc(doc(db, "projects", projectId));
+                            const scripts = projectSnap.data().brandCreative.scripts;
+                            const scriptIndex = scripts.findIndex(s => s.id === scriptId);
+                            if (scriptIndex > -1) {
+                                scripts[scriptIndex].text = textarea.value;
+                                await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
+                            }
+                        } finally {
+                             toggleButtonLoading(btn, false, '儲存腳本');
+                        }
+                    });
+                });
+                
+                detailView.querySelectorAll('.approve-script-btn').forEach(btn => {
+                     btn.addEventListener('click', () => approveScript(projectId, parseInt(btn.dataset.scriptId), btn));
+                });
+
+                detailView.querySelectorAll('.toggle-step-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const stepNum = parseInt(btn.dataset.step);
+                        toggleButtonLoading(btn, true, btn.textContent);
+                        try {
+                            const projectRef = doc(db, "projects", projectId);
+                            const projectSnap = await getDoc(projectRef);
+                            const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
+                            await updateDoc(projectRef, {
+                                completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
+                                [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
+                            });
+                        } finally {
+                            // Re-render will handle the button text, no need to toggle off
+                        }
+                    });
+                });
+
+                const addMemberBtn = detailView.querySelector('#add-member-btn');
+                if (addMemberBtn) {
+                    addMemberBtn.addEventListener('click', async () => {
+                        const emailInput = detailView.querySelector('#add-member-email');
+                        const email = emailInput.value.trim();
+                        if (!email) return alert('請輸入 Email');
+                        toggleButtonLoading(addMemberBtn, true, '新增成員');
+                        try {
+                            const usersRef = collection(db, "users");
+                            const q = query(usersRef, where("email", "==", email));
+                            const querySnapshot = await getDocs(q);
+                            
+                            if (querySnapshot.empty) throw new Error(`找不到 Email 為 ${email} 的使用者。請確認該使用者已用 Google 登入過一次系統。`);
+
+                            const userDoc = querySnapshot.docs[0];
+                            const newMemberUid = userDoc.id;
+                            const newMemberData = userDoc.data();
+
+                            const projectRef = doc(db, "projects", projectId);
+                            await updateDoc(projectRef, {
+                                [`members.${newMemberUid}`]: {
+                                    email: newMemberData.email,
+                                    name: newMemberData.name,
+                                    avatar: newMemberData.avatar,
+                                    role: 'member' // Default role
+                                }
+                            });
+                            emailInput.value = '';
+                            alert(`已成功新增成員 ${email}`);
+                        } catch (error) {
+                            alert(error.message);
+                        } finally {
+                            toggleButtonLoading(addMemberBtn, false, '新增成員');
+                        }
+                    });
+                }
+
+                 detailView.querySelectorAll('.remove-member-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const emailToRemove = btn.dataset.email;
+                        if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
+
+                        const projectRef = doc(db, "projects", projectId);
+                        try {
+                           const projectSnap = await getDoc(projectRef);
+                           const members = projectSnap.data().members;
+                           const uidToRemove = Object.keys(members).find(uid => members[uid].email === emailToRemove);
+                           
+                           if(uidToRemove) {
+                                await updateDoc(projectRef, {
+                                    [`members.${uidToRemove}`]: deleteField()
+                                });
+                                alert('成員已移除');
+                           }
+                        } catch (error) {
+                            alert('移除成員失敗: ' + error.message);
+                        }
+                    });
+                });
+            }
+        }
+        
+        // --- GLOBAL EVENT LISTENERS ---
+        UI.googleLoginBtn.addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error));
+        UI.logoutBtn.addEventListener('click', () => signOut(auth));
+        UI.newProjectBtn.addEventListener('click', () => openProjectModal());
+        UI.projectForm.addEventListener('submit', handleProjectFormSubmit);
+        UI.userMenuBtn.addEventListener('click', () => UI.userMenu.classList.toggle('hidden'));
+        UI.closeModalBtns.forEach(btn => btn.addEventListener('click', () => {
+            UI.projectModal.classList.add('hidden');
+            UI.deleteConfirmModal.classList.add('hidden');
+        }));
+        UI.cancelDeleteBtn.addEventListener('click', () => UI.deleteConfirmModal.classList.add('hidden'));
+
+        function backToProjectsList() {
+            Object.values(unsubscribeComments).forEach(unsub => unsub());
+            unsubscribeComments = {};
+            if(unsubscribeProjectDetail) unsubscribeProjectDetail();
+            UI.projectDetailView.classList.add('hidden');
+            UI.projectDetailView.innerHTML = '';
+            UI.projectsView.classList.remove('hidden');
+        }
+
+        async function handleDeleteProject(projectId) {
+            const commentsRef = collection(db, "projects", projectId, "scriptComments");
+            const commentsSnap = await getDocs(commentsRef);
+            const batch = writeBatch(db);
+            commentsSnap.docs.forEach(doc => batch.delete(doc.ref));
+            await batch.commit();
+            await deleteDoc(doc(db, "projects", projectId));
+            backToProjectsList();
+            UI.deleteConfirmModal.classList.add('hidden');
+        }
+
     </script>
 </body>
 </html>
