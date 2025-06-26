@@ -274,7 +274,16 @@
             UI.userName.textContent = currentUser.name;
             UI.userAvatar.src = currentUser.avatar;
             UI.adminBadge.classList.toggle('hidden', !isSuperAdmin(currentUser));
-            listenForProjects();
+            
+            // 測試 Firebase 連接
+            testFirebaseConnection().then(success => {
+                if (success) {
+                    console.log('Firebase 測試通過，開始監聽專案');
+                    listenForProjects();
+                } else {
+                    console.error('Firebase 測試失敗，無法載入專案');
+                }
+            });
             
             // 如果是超級管理員，執行遷移並顯示調試面板
             if (isSuperAdmin(currentUser)) {
@@ -296,6 +305,37 @@
             ];
             
             UI.debugContent.innerHTML = debugInfo.map(info => `<div>${info}</div>`).join('');
+        }
+
+        // 測試 Firebase 連接和權限
+        async function testFirebaseConnection() {
+            console.log('開始測試 Firebase 連接...');
+            
+            try {
+                // 測試讀取專案
+                const projectsRef = collection(db, "projects");
+                const snapshot = await getDocs(projectsRef);
+                console.log('Firebase 連接成功，專案總數:', snapshot.size);
+                
+                // 測試寫入權限（建立測試文件）
+                const testRef = doc(collection(db, "test"));
+                await setDoc(testRef, { 
+                    test: true, 
+                    timestamp: serverTimestamp(),
+                    user: currentUser.uid 
+                });
+                console.log('Firebase 寫入權限正常');
+                
+                // 清理測試文件
+                await deleteDoc(testRef);
+                console.log('Firebase 刪除權限正常');
+                
+                return true;
+            } catch (error) {
+                console.error('Firebase 測試失敗:', error);
+                alert('Firebase 連接測試失敗: ' + error.message);
+                return false;
+            }
         }
 
         // --- CRUD & Core Logic ---
@@ -328,10 +368,15 @@
                 };
 
                 if (id) {
+                    // 更新現有專案時，確保保留原有的 ownerId 和 members
+                    console.log('更新專案:', id, projectData);
                     await updateDoc(doc(db, "projects", id), projectData);
+                    console.log('專案更新成功');
                 } else {
-                    Object.assign(projectData, {
-                        projectId: `PROJ_${Date.now()}`,
+                    // 建立新專案時，確保包含所有必要的欄位
+                    const newProjectData = {
+                        ...projectData,
+                        projectId: `PROJ_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                         ownerId: currentUser.uid,
                         ownerEmail: currentUser.email,
                         ownerName: currentUser.name,
@@ -344,15 +389,23 @@
                         briefingFiles: { documents: [], logos: [], videos: [] },
                         aiFiles: { file1: [], file2: [] },
                         mediaProposals: [],
-                        brandCreative: { redirectLink: '', scripts: [
-                            { id: 1, text: '', status: 'pending', approvedBy: null, approvalDate: null },
-                            { id: 2, text: '', status: 'pending', approvedBy: null, approvalDate: null },
-                            { id: 3, text: '', status: 'pending', approvedBy: null, approvalDate: null }
-                        ]},
+                        brandCreative: { 
+                            redirectLink: '', 
+                            scripts: [
+                                { id: 1, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                                { id: 2, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                                { id: 3, text: '', status: 'pending', approvedBy: null, approvalDate: null }
+                            ]
+                        },
                         creativeFolder: []
-                    });
-                    const docRef = await addDoc(collection(db, "projects"), projectData);
-                    console.log('新專案已建立，ID:', docRef.id, '專案編碼:', projectData.projectId);
+                    };
+                    
+                    console.log('建立新專案:', newProjectData);
+                    const docRef = await addDoc(collection(db, "projects"), newProjectData);
+                    console.log('新專案已建立，Firestore ID:', docRef.id, '專案編碼:', newProjectData.projectId);
+                    
+                    // 顯示成功訊息
+                    alert(`專案 "${newProjectData.name}" 建立成功！`);
                 }
                 UI.projectModal.classList.add('hidden');
             } catch (error) {
@@ -455,16 +508,27 @@
         
         // --- RENDERING LOGIC ---
         function renderProjectsList(projects) {
+            console.log('開始渲染專案列表，專案數量:', projects.length);
             UI.projectsContainer.innerHTML = '';
-            if (projects.length === 0) {
-                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
+            
+            if (!projects || projects.length === 0) {
+                UI.projectsContainer.innerHTML = `
+                    <div class="col-span-full text-center py-10">
+                        <p class="text-gray-500 mb-4">目前沒有專案</p>
+                        <p class="text-sm text-gray-400">點擊右上角「新增專案」按鈕來建立您的第一個專案</p>
+                    </div>`;
+                return;
             }
+            
+            // 按建立時間排序（最新的在前）
             projects.sort((a, b) => {
                 const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
                 const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
                 return bTime - aTime;
             });
+            
             projects.forEach(project => {
+                console.log('渲染專案:', project.name, 'ID:', project.id);
                 const card = document.createElement('div');
                 card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
                 const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
@@ -484,7 +548,10 @@
                         <div class="flex items-center mt-4"><div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div><span class="text-sm font-medium text-gray-700">${progress}%</span></div>
                     </div>`;
                 card.addEventListener('click', () => showProjectDetail(project.id));
+                UI.projectsContainer.appendChild(card);
             });
+            
+            console.log('專案列表渲染完成');
         }
 
         function renderProjectDetail(project, canEdit) {
@@ -716,16 +783,34 @@
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
             
-            // *** FIXED: Correct query for ARRAY data structure ***
-            const q = isSuperAdmin(currentUser) 
-                ? query(projectsRef) 
-                : query(projectsRef, where("members", "array-contains", currentUser.uid));
+            console.log('開始監聽專案，當前使用者:', currentUser);
+            console.log('是否為超級管理員:', isSuperAdmin(currentUser));
+            
+            // 簡化查詢邏輯：超級管理員看所有專案，一般使用者看自己的專案
+            let q;
+            if (isSuperAdmin(currentUser)) {
+                q = query(projectsRef);
+                console.log('超級管理員查詢：所有專案');
+            } else {
+                // 使用 array-contains 查詢使用者的專案
+                q = query(projectsRef, where("members", "array-contains", currentUser.uid));
+                console.log('一般使用者查詢：成員包含', currentUser.uid);
+            }
             
             unsubscribeProjects = onSnapshot(q, snapshot => {
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log('收到專案資料:', projects.length, '個專案');
+                projects.forEach(project => {
+                    console.log('專案:', project.name, 'ID:', project.id, '擁有者:', project.ownerId, '成員:', project.members);
+                });
                 renderProjectsList(projects);
             }, error => {
                 console.error("監聽專案列表失敗:", error);
+                // 顯示錯誤給使用者
+                UI.projectsContainer.innerHTML = `<div class="col-span-full text-center py-10">
+                    <p class="text-red-500 mb-4">載入專案失敗: ${error.message}</p>
+                    <button onclick="location.reload()" class="bg-blue-500 text-white px-4 py-2 rounded">重新載入</button>
+                </div>`;
             });
         }
         
