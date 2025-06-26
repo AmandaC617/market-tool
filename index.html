@@ -370,8 +370,8 @@
             }
             // *** MODIFIED: More robust sorting ***
             projects.sort((a, b) => {
-                const aTime = a.createdAt?.toDate?.()?.getTime() || 0;
-                const bTime = b.createdAt?.toDate?.()?.getTime() || 0;
+                const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
+                const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
                 return bTime - aTime;
             });
             projects.forEach(project => {
