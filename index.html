@@ -230,7 +230,7 @@
             toggleButtonLoading(submitButton, true, '儲存');
 
             if (!currentUser) {
-                alert('錯誤：使用者未登入，無法儲存專案。');
+                console.error('錯誤：使用者未登入，無法儲存專案。');
                 toggleButtonLoading(submitButton, false, '儲存');
                 return;
             }
@@ -277,7 +277,6 @@
                 UI.projectModal.classList.add('hidden');
             } catch (error) {
                 console.error("專案儲存失敗:", error);
-                alert(`儲存專案時發生錯誤: ${error.message}`);
             } finally {
                 toggleButtonLoading(submitButton, false, '儲存');
                 UI.projectForm.reset();
@@ -318,7 +317,6 @@
                 await updateDoc(doc(db, "projects", projectId), { [field]: arrayUnion(logEntry) });
             } catch (error) {
                 console.error("新增日誌失敗:", error);
-                alert("新增日誌失敗: " + error.message);
             } finally {
                 toggleButtonLoading(button, false, '新增');
             }
@@ -332,7 +330,6 @@
                 await addDoc(collection(db, "projects", projectId, "scriptComments"), commentData);
              } catch(error) {
                 console.error("新增留言失敗:", error);
-                alert("新增留言失敗: " + error.message);
              } finally {
                 toggleButtonLoading(button, false, '送出');
              }
@@ -356,7 +353,6 @@
                 }
             } catch(error) {
                 console.error("審核失敗:", error);
-                alert("審核失敗: " + error.message);
             }
         }
         
@@ -366,7 +362,6 @@
             if (projects.length === 0) {
                 UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
-            // *** MODIFIED: More robust sorting based on user feedback ***
             projects.sort((a, b) => {
                 const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
                 const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
@@ -884,3 +879,4 @@
     </script>
 </body>
 </html>
+
