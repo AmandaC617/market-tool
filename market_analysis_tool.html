@@ -74,7 +74,6 @@
                     <div><label class="block text-gray-700 mb-2" for="market-input">市場*</label><input type="text" id="market-input" class="w-full px-4 py-2 border rounded-md" placeholder="例如: TW, US, JP" required></div>
                     <div><label class="block text-gray-700 mb-2" for="proposal-time-input">提案時間*</label><input type="date" id="proposal-time-input" class="w-full px-4 py-2 border rounded-md" required></div>
                 </div>
-                <!-- *** NEW: Added status and dates *** -->
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
                      <div><label class="block text-gray-700 mb-2" for="status-input">專案狀態</label>
                         <select id="status-input" class="w-full px-4 py-2 border rounded-md bg-white">
@@ -151,9 +150,9 @@
             clientNameInput: document.getElementById('client-name-input'),
             marketInput: document.getElementById('market-input'),
             proposalTimeInput: document.getElementById('proposal-time-input'),
-            statusInput: document.getElementById('status-input'), // *** NEW ***
-            launchDateInput: document.getElementById('launch-date-input'), // *** NEW ***
-            closeDateInput: document.getElementById('close-date-input'), // *** NEW ***
+            statusInput: document.getElementById('status-input'),
+            launchDateInput: document.getElementById('launch-date-input'),
+            closeDateInput: document.getElementById('close-date-input'),
             dashboardInternalLinkInput: document.getElementById('dashboard-internal-link-input'),
             dashboardClientLinkInput: document.getElementById('dashboard-client-link-input'),
             closeModalBtns: document.querySelectorAll('.close-modal-btn'),
@@ -166,9 +165,9 @@
         const isSuperAdmin = (user) => user?.email === SUPER_ADMIN_EMAIL;
         const toLocaleString = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('zh-TW', { hour12: false }) : 'N/A';
         const toLocaleDateString = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('zh-TW') : 'N/A';
-        const escapeHTML = (str) => str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match]));
+        const escapeHTML = (str) => str ? str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match])) : '';
 
-        // --- AUTHENTICATION ---
+        // --- AUTHENTICATION & App Initialization ---
         onAuthStateChanged(auth, user => {
             UI.loader.classList.add('hidden');
             if (user) {
@@ -176,6 +175,7 @@
                 initializeAppUI();
             } else {
                 currentUser = null;
+                // Cleanup all listeners on logout
                 Object.values(unsubscribeComments).forEach(unsub => unsub());
                 if (unsubscribeProjects) unsubscribeProjects();
                 if (unsubscribeProjectDetail) unsubscribeProjectDetail();
@@ -185,7 +185,6 @@
             }
         });
 
-        // --- App Logic ---
         function initializeAppUI() {
             UI.loginModal.classList.add('hidden');
             UI.app.classList.remove('hidden');
@@ -195,6 +194,7 @@
             listenForProjects();
         }
 
+        // --- CRUD & Core Logic ---
         function handleProjectFormSubmit(e) {
             e.preventDefault();
             const id = UI.projectIdInput.value;
@@ -313,22 +313,20 @@
                         <p class="text-xs text-gray-400 mt-2">結案日: ${toLocaleDateString(project.closeDate)}</p>
                         <div class="flex items-center mt-4"><div class="w-full bg-gray-200 rounded-full h-2 mr-4"><div class="bg-indigo-600 h-2 rounded-full" style="width: ${progress}%"></div></div><span class="text-sm font-medium text-gray-700">${progress}%</span></div>
                     </div>`;
-                card.addEventListener('click', () => showProjectDetail(project.id));
-                UI.projectsContainer.appendChild(card);
+                card.addEventListener('click', () => showProjectDetail(project.id, project.ownerId));
             });
         }
 
-        function renderProjectDetail(project) {
-            UI.projectDetailView.innerHTML = ''; if (!project) return;
-            const canEdit = isSuperAdmin(currentUser);
+        function renderProjectDetail(project, canEdit) {
+            const projectId = project.id;
             const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
 
             const detailHTML = `
                 <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
-                    <button id="back-to-projects" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; 返回專案列表</button>
+                    <button id="back-to-projects-btn" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; 返回專案列表</button>
                     <div class="flex items-center gap-2">
-                        <button id="export-report-btn" data-id="${project.id}" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md">匯出專案報告</button>
-                        ${canEdit ? `<button id="edit-project-btn" data-id="${project.id}" class="bg-gray-200 py-2 px-4 rounded-md">編輯</button><button id="delete-project-btn" data-id="${project.id}" class="bg-red-500 text-white py-2 px-4 rounded-md">刪除</button>` : ''}
+                        <button id="export-report-btn" class="bg-blue-500 hover:bg-blue-600 text-white py-2 px-4 rounded-md">匯出專案報告</button>
+                        ${canEdit ? `<button id="edit-project-btn" class="bg-gray-200 py-2 px-4 rounded-md">編輯</button><button id="delete-project-btn" class="bg-red-500 text-white py-2 px-4 rounded-md">刪除</button>` : ''}
                     </div>
                 </div>
                 <div class="bg-white p-6 rounded-lg shadow-md mb-8">
@@ -350,9 +348,12 @@
                     </div>
                     <div class="mt-6"><h3 class="text-sm font-medium text-gray-500">專案總進度</h3><div class="mt-2 flex items-center"><div class="w-full bg-gray-200 rounded-full h-4 mr-4"><div class="progress-bar bg-indigo-600 h-4 rounded-full" style="width: ${progress}%"></div></div><span class="font-bold">${progress}%</span></div></div>
                 </div>
-                <div id="steps-container" class="space-y-6">${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project)).join('')}</div>`;
+                <div id="steps-container" class="space-y-6">${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project, canEdit)).join('')}</div>`;
+            
             UI.projectDetailView.innerHTML = detailHTML;
-            project.brandCreative.scripts.forEach(script => listenForScriptComments(project.id, script.id));
+            
+            // *** NEW: Centralized event binding after rendering ***
+            bindDetailViewEvents(projectId, project, canEdit);
         }
         
         const renderLogList = (logs = []) => {
@@ -375,16 +376,15 @@
             container.scrollTop = container.scrollHeight;
         }
 
-        function renderStepCard(stepNum, project) {
+        function renderStepCard(stepNum, project, canEdit) {
             const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾"];
             const isComplete = project.completedSteps?.includes(stepNum);
-            const canEdit = isSuperAdmin(currentUser);
 
             const renderAdminInput = (inputId, fieldPath, placeholder) => canEdit ? `
                 <div class="mt-4 pt-4 border-t border-dashed">
                     <div class="flex gap-2 items-center">
-                        <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}">
-                        <button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input="${inputId}">新增</button>
+                        <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm" id="${inputId}-${stepNum}">
+                        <button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button>
                     </div>
                 </div>` : '';
 
@@ -413,7 +413,7 @@
                         const link = project.brandCreative?.redirectLink || '';
                         return `<div><h5 class="font-bold text-gray-700">跳轉頁面路徑</h5>
                                 <p class="text-sm text-blue-600 break-all p-2 bg-gray-50 rounded">${link ? `<a href="${link}" target="_blank">${escapeHTML(link)}</a>` : '未提供'}</p></div>
-                                ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input="input-brand-redirect">儲存</button></div></div>` : ''}`;
+                                ${canEdit ? `<div class="mt-4 pt-4 border-t border-dashed"><div class="flex gap-2 items-center"><input type="url" value="${escapeHTML(link)}" placeholder="設定跳轉連結..." class="flex-grow p-1 border rounded" id="input-brand-redirect"><button class="save-field-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="brandCreative.redirectLink" data-input-id="input-brand-redirect">儲存</button></div></div>` : ''}`;
                     case 5:
                         return `<div class="space-y-6">
                             ${project.brandCreative.scripts.map(script => {
@@ -453,7 +453,7 @@
                     </div>
                     <div id="step-content-${stepNum}" class="step-content mt-4 pt-4 border-t border-gray-200">
                         ${renderStepContent()}
-                        ${canEdit ? `<div class="mt-6 text-right"><button class="toggle-step-btn ${isComplete ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white py-2 px-4 rounded-md" data-step="${stepNum}" data-id="${project.id}">${isComplete ? '標記為未完成' : '標記為完成'}</button></div>` : ''}
+                        ${canEdit ? `<div class="mt-6 text-right"><button class="toggle-step-btn ${isComplete ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'} text-white py-2 px-4 rounded-md" data-step="${stepNum}">${isComplete ? '標記為未完成' : '標記為完成'}</button></div>` : ''}
                     </div>
                 </div>`;
         }
@@ -476,7 +476,9 @@
             const projectRef = doc(db, "projects", projectId);
             unsubscribeProjectDetail = onSnapshot(projectRef, (doc) => {
                 if (doc.exists()) {
-                    renderProjectDetail({ id: doc.id, ...doc.data() });
+                    const projectData = { id: doc.id, ...doc.data() };
+                    const canEdit = isSuperAdmin(currentUser);
+                    renderProjectDetail(projectData, canEdit);
                 } else {
                     backToProjectsList();
                 }
@@ -494,95 +496,109 @@
             }, console.error);
         }
 
-        // --- Event Delegation ---
-        document.addEventListener('click', async e => {
-            const target = e.target;
-            const projectDetail = target.closest('#project-detail-view');
-            const projectId = projectDetail?.querySelector('[data-id]')?.dataset.id || target.closest('[data-id]')?.dataset.id;
-            
-            // Global Buttons
-            if (target.id === 'google-login-btn') handleGoogleLogin();
-            if (target.id === 'logout-button') signOut(auth);
-            if (target.id === 'new-project-btn') openProjectModal();
-            if (target.closest('.close-modal-btn')) { UI.projectModal.classList.add('hidden'); UI.deleteConfirmModal.classList.add('hidden'); }
-            if (target.id === 'cancel-delete-btn') UI.deleteConfirmModal.classList.add('hidden');
+        // *** NEW: Centralized event binding function ***
+        function bindDetailViewEvents(projectId, project, canEdit) {
+            const detailView = UI.projectDetailView;
 
-            // Project-specific actions
-            if (target.id === 'back-to-projects') backToProjectsList();
+            // General Actions
+            detailView.querySelector('#back-to-projects-btn').addEventListener('click', backToProjectsList);
+            // detailView.querySelector('#export-report-btn').addEventListener('click', () => exportProjectReport(projectId));
             
-            if (target.id === 'edit-project-btn' && isSuperAdmin(currentUser)) {
-                const docSnap = await getDoc(doc(db, "projects", target.dataset.id));
-                if (docSnap.exists()) openProjectModal({id: docSnap.id, ...docSnap.data()});
-            }
-             if (target.id === 'delete-project-btn' && isSuperAdmin(currentUser)) {
-                UI.deleteConfirmModal.classList.remove('hidden');
-                UI.confirmDeleteBtn.onclick = () => handleDeleteProject(target.dataset.id);
-             }
+            // Accordion togglers
+            detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
+                toggler.addEventListener('click', () => {
+                    const content = document.getElementById(`step-content-${toggler.dataset.stepToggler}`);
+                    const icon = toggler.querySelector('svg');
+                    if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                        content.style.maxHeight = '0px';
+                        icon.style.transform = 'rotate(0deg)';
+                    } else {
+                        content.style.maxHeight = content.scrollHeight + 40 + "px";
+                        icon.style.transform = 'rotate(180deg)';
+                    }
+                });
+            });
 
-            // --- Super Admin ONLY actions within a project ---
-            if (isSuperAdmin(currentUser) && projectDetail) {
-                if (target.classList.contains('add-log-btn')) {
-                    const field = target.dataset.field;
-                    const input = document.getElementById(target.dataset.input);
-                    if (input.value) {
-                       await addFileLog(projectId, field, input.value);
-                       input.value = '';
-                    }
-                }
-                if (target.classList.contains('save-field-btn')) {
-                    const field = target.dataset.field;
-                    const input = document.getElementById(target.dataset.input);
-                    await updateDoc(doc(db, "projects", projectId), { [field]: input.value });
-                }
-                if (target.classList.contains('save-script-btn')) {
-                    const scriptId = parseInt(target.dataset.scriptId);
-                    const textarea = projectDetail.querySelector(`textarea[data-script-id="${scriptId}"]`);
-                    const projectSnap = await getDoc(doc(db, "projects", projectId));
-                    const scripts = projectSnap.data().brandCreative.scripts;
-                    const scriptIndex = scripts.findIndex(s => s.id === scriptId);
-                    if(scriptIndex > -1) {
-                       scripts[scriptIndex].text = textarea.value;
-                       await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
-                    }
-                }
-                if (target.classList.contains('approve-script-btn')) {
-                    await approveScript(projectId, parseInt(target.dataset.scriptId));
-                }
-                if (target.classList.contains('toggle-step-btn')) {
-                    const stepNum = parseInt(target.dataset.step);
-                    const projectRef = doc(db, "projects", projectId);
-                    const projectSnap = await getDoc(projectRef);
-                    const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
-                    await updateDoc(projectRef, {
-                        completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
-                        [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
+            // Commenting actions for any user
+            detailView.querySelectorAll('.add-script-comment-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const scriptId = parseInt(btn.dataset.scriptId);
+                    const input = detailView.querySelector(`#comment-input-${scriptId}`);
+                    await addScriptComment(projectId, scriptId, input.value);
+                    input.value = '';
+                });
+            });
+            
+            // --- Super Admin ONLY Actions ---
+            if (canEdit) {
+                detailView.querySelector('#edit-project-btn')?.addEventListener('click', () => openProjectModal(project));
+                detailView.querySelector('#delete-project-btn')?.addEventListener('click', () => {
+                    UI.deleteConfirmModal.classList.remove('hidden');
+                    UI.confirmDeleteBtn.onclick = () => handleDeleteProject(projectId);
+                });
+
+                detailView.querySelectorAll('.add-log-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                        if (input && input.value) {
+                            await addFileLog(projectId, btn.dataset.field, input.value);
+                            input.value = '';
+                        }
                     });
-                }
-            }
+                });
 
-            // General user actions
-            if (target.classList.contains('add-script-comment-btn')) {
-                const scriptId = parseInt(target.dataset.scriptId);
-                const input = document.getElementById(`comment-input-${scriptId}`);
-                await addScriptComment(projectId, scriptId, input.value);
-                input.value = '';
-            }
+                detailView.querySelectorAll('.save-field-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const input = detailView.querySelector(`#${btn.dataset.inputId}`);
+                        await updateDoc(doc(db, "projects", projectId), { [btn.dataset.field]: input.value });
+                    });
+                });
 
-            // Accordion Toggler
-            const toggler = target.closest('[data-step-toggler]');
-            if (toggler) {
-                const content = document.getElementById(`step-content-${toggler.dataset.stepToggler}`);
-                const icon = toggler.querySelector('svg');
-                if (content.style.maxHeight && content.style.maxHeight !== '0px') {
-                    content.style.maxHeight = '0px';
-                    icon.style.transform = 'rotate(0deg)';
-                } else {
-                    content.style.maxHeight = content.scrollHeight + 40 + "px";
-                    icon.style.transform = 'rotate(180deg)';
-                }
+                detailView.querySelectorAll('.save-script-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const scriptId = parseInt(btn.dataset.scriptId);
+                        const textarea = detailView.querySelector(`textarea[data-script-id="${scriptId}"]`);
+                        const projectSnap = await getDoc(doc(db, "projects", projectId));
+                        const scripts = projectSnap.data().brandCreative.scripts;
+                        const scriptIndex = scripts.findIndex(s => s.id === scriptId);
+                        if (scriptIndex > -1) {
+                            scripts[scriptIndex].text = textarea.value;
+                            await updateDoc(doc(db, "projects", projectId), { "brandCreative.scripts": scripts });
+                        }
+                    });
+                });
+                
+                detailView.querySelectorAll('.approve-script-btn').forEach(btn => {
+                     btn.addEventListener('click', () => approveScript(projectId, parseInt(btn.dataset.scriptId)));
+                });
+
+                detailView.querySelectorAll('.toggle-step-btn').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const stepNum = parseInt(btn.dataset.step);
+                        const projectRef = doc(db, "projects", projectId);
+                        const projectSnap = await getDoc(projectRef);
+                        const isComplete = projectSnap.data().completedSteps?.includes(stepNum);
+                        await updateDoc(projectRef, {
+                            completedSteps: isComplete ? arrayRemove(stepNum) : arrayUnion(stepNum),
+                            [`stepCompletionDates.${stepNum}`]: isComplete ? deleteField() : new Date().toISOString()
+                        });
+                    });
+                });
             }
-        });
+        }
         
+        // --- GLOBAL EVENT LISTENERS (for modals, etc.) ---
+        UI.googleLoginBtn.addEventListener('click', () => signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error));
+        UI.logoutBtn.addEventListener('click', () => signOut(auth));
+        UI.newProjectBtn.addEventListener('click', () => openProjectModal());
+        UI.projectForm.addEventListener('submit', handleProjectFormSubmit);
+        UI.userMenuBtn.addEventListener('click', () => UI.userMenu.classList.toggle('hidden'));
+        UI.closeModalBtns.forEach(btn => btn.addEventListener('click', () => {
+            UI.projectModal.classList.add('hidden');
+            UI.deleteConfirmModal.classList.add('hidden');
+        }));
+        UI.cancelDeleteBtn.addEventListener('click', () => UI.deleteConfirmModal.classList.add('hidden'));
+
         function backToProjectsList() {
             Object.values(unsubscribeComments).forEach(unsub => unsub());
             unsubscribeComments = {};
@@ -591,6 +607,7 @@
             UI.projectDetailView.innerHTML = '';
             UI.projectsView.classList.remove('hidden');
         }
+
         async function handleDeleteProject(projectId) {
             const commentsRef = collection(db, "projects", projectId, "scriptComments");
             const commentsSnap = await getDocs(commentsRef);
@@ -601,9 +618,7 @@
             backToProjectsList();
             UI.deleteConfirmModal.classList.add('hidden');
         }
-        function handleGoogleLogin() { signInWithPopup(auth, new GoogleAuthProvider()).catch(console.error); }
+
     </script>
 </body>
 </html>
-
-
