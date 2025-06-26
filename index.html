@@ -244,7 +244,15 @@
         };
 
         // --- Helper Functions ---
-        const isSuperAdmin = (user) => user?.email === SUPER_ADMIN_EMAIL;
+        const isSuperAdmin = (user) => {
+            const result = user?.email === SUPER_ADMIN_EMAIL;
+            console.log('超級管理員檢查:', {
+                userEmail: user?.email,
+                superAdminEmail: SUPER_ADMIN_EMAIL,
+                isSuperAdmin: result
+            });
+            return result;
+        };
         const toLocaleString = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('zh-TW', { hour12: false }) : 'N/A';
         const toLocaleDateString = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString('zh-TW') : 'N/A';
         const escapeHTML = (str) => str ? str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match])) : '';
@@ -816,28 +824,20 @@
         // --- RENDERING LOGIC ---
         function renderProjectsList(projects) {
             console.log('開始渲染專案列表，專案數量:', projects.length);
+            console.log('當前使用者:', currentUser);
+            console.log('是否為超級管理員:', isSuperAdmin(currentUser));
+            
             UI.projectsContainer.innerHTML = '';
             
-            if (!projects || projects.length === 0) {
-                UI.projectsContainer.innerHTML = `
-                    <div class="col-span-full text-center py-10">
-                        <p class="text-gray-500 mb-4">目前沒有專案</p>
-                        <p class="text-sm text-gray-400">點擊右上角「新增專案」按鈕來建立您的第一個專案</p>
-                    </div>`;
+            if (projects.length === 0) {
+                UI.projectsContainer.innerHTML = '<div class="col-span-full text-center py-10"><p class="text-gray-500">尚無專案</p></div>';
                 return;
             }
-            
-            // 按建立時間排序（最新的在前）
-            projects.sort((a, b) => {
-                const aTime = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : 0;
-                const bTime = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : 0;
-                return bTime - aTime;
-            });
-            
+
             projects.forEach(project => {
                 console.log('渲染專案:', project.name, 'ID:', project.id);
                 const card = document.createElement('div');
-                card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer';
+                card.className = 'project-card bg-white rounded-lg shadow-md overflow-hidden cursor-pointer hover:shadow-lg transition-shadow';
                 const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
                 const status = project.status || 'active';
                 const statusClass = status === 'closed' ? 'bg-gray-500' : 'bg-green-500';
@@ -874,14 +874,19 @@
                             <p class="text-xs text-yellow-800 font-medium">待完成: ${incompleteSteps.slice(0, 2).join(', ')}${incompleteSteps.length > 2 ? '...' : ''}</p>
                         </div>` : ''}
                     </div>`;
-                card.addEventListener('click', () => {
+                
+                // 綁定點擊事件
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     console.log('點擊專案卡片:', project.id, project.name);
                     showProjectDetail(project.id);
                 });
+                
                 UI.projectsContainer.appendChild(card);
             });
             
-            console.log('專案列表渲染完成');
+            console.log('專案列表渲染完成，總共渲染了', projects.length, '個專案');
         }
 
         function renderProjectDetail(project, canEdit) {
@@ -1227,6 +1232,9 @@
         
         function showProjectDetail(projectId) {
             console.log('顯示專案詳情:', projectId);
+            console.log('當前使用者:', currentUser);
+            console.log('是否為超級管理員:', isSuperAdmin(currentUser));
+            
             UI.projectsView.classList.add('hidden');
             UI.projectDetailView.classList.remove('hidden');
             
@@ -1243,6 +1251,7 @@
                     const projectData = { id: doc.id, ...doc.data() };
                     const canEdit = isSuperAdmin(currentUser);
                     console.log('專案詳情載入成功:', projectData.name, '可編輯:', canEdit);
+                    console.log('專案擁有者:', projectData.ownerId, '當前使用者:', currentUser?.uid);
                     renderProjectDetail(projectData, canEdit);
                     lastKnownProjectState[projectId] = projectData; 
                     
@@ -1305,43 +1314,80 @@
             const detailView = UI.projectDetailView;
 
             console.log('綁定專案詳情事件，專案ID:', projectId, '可編輯:', canEdit);
+            console.log('當前使用者:', currentUser);
+            console.log('是否為超級管理員:', isSuperAdmin(currentUser));
 
             // 返回按鈕
             const backBtn = detailView.querySelector('#back-to-projects-btn');
             if (backBtn) {
-                backBtn.addEventListener('click', () => {
+                console.log('找到返回按鈕，綁定事件');
+                backBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     console.log('點擊返回按鈕');
                     backToProjectsList();
                 });
+            } else {
+                console.error('找不到返回按鈕');
             }
 
             // 編輯按鈕
             const editBtn = detailView.querySelector('#edit-project-btn');
             if (editBtn && canEdit) {
-                editBtn.addEventListener('click', () => {
+                console.log('找到編輯按鈕，綁定事件');
+                editBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     console.log('點擊編輯按鈕');
                     openProjectModal(project);
                 });
+            } else {
+                console.log('編輯按鈕狀態:', editBtn ? '存在但無權限' : '不存在');
             }
 
             // 刪除按鈕
             const deleteBtn = detailView.querySelector('#delete-project-btn');
             if (deleteBtn && canEdit) {
-                deleteBtn.addEventListener('click', () => {
+                console.log('找到刪除按鈕，綁定事件');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     console.log('點擊刪除按鈕');
                     UI.confirmDeleteBtn.onclick = () => handleDeleteProject(projectId);
                     UI.deleteConfirmModal.classList.remove('hidden');
                 });
+            } else {
+                console.log('刪除按鈕狀態:', deleteBtn ? '存在但無權限' : '不存在');
             }
 
             detailView.querySelectorAll('[data-step-toggler]').forEach(toggler => {
-                toggler.addEventListener('click', () => {
+                console.log('綁定步驟展開事件:', toggler.dataset.stepToggler);
+                toggler.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     const stepNum = toggler.dataset.stepToggler;
                     const content = document.getElementById(`step-content-${stepNum}`);
-                    document.getElementById(`new-activity-${stepNum}`)?.classList.add('hidden');
+                    const newActivityDot = document.getElementById(`new-activity-${stepNum}`);
                     const icon = toggler.querySelector('svg');
-                    content.style.maxHeight = (content.style.maxHeight && content.style.maxHeight !== '0px') ? '0px' : content.scrollHeight + 40 + "px";
-                    icon.style.transform = (content.style.maxHeight !== '0px') ? 'rotate(180deg)' : 'rotate(0deg)';
+                    
+                    console.log('點擊步驟展開:', stepNum);
+                    
+                    if (content) {
+                        if (content.style.maxHeight && content.style.maxHeight !== '0px') {
+                            content.style.maxHeight = '0px';
+                            icon.style.transform = 'rotate(0deg)';
+                        } else {
+                            content.style.maxHeight = content.scrollHeight + 40 + "px";
+                            icon.style.transform = 'rotate(180deg)';
+                        }
+                        
+                        // 隱藏新活動提示
+                        if (newActivityDot) {
+                            newActivityDot.classList.add('hidden');
+                        }
+                    } else {
+                        console.error('找不到步驟內容:', stepNum);
+                    }
                 });
             });
 
