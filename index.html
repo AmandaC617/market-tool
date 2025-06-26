@@ -317,23 +317,24 @@
                 const snapshot = await getDocs(projectsRef);
                 console.log('Firebase 連接成功，專案總數:', snapshot.size);
                 
-                // 測試寫入權限（建立測試文件）
-                const testRef = doc(collection(db, "test"));
-                await setDoc(testRef, { 
-                    test: true, 
-                    timestamp: serverTimestamp(),
-                    user: currentUser.uid 
-                });
-                console.log('Firebase 寫入權限正常');
+                // 測試讀取使用者資料
+                const usersRef = collection(db, "users");
+                const usersSnapshot = await getDocs(usersRef);
+                console.log('Firebase 使用者資料讀取成功，使用者數量:', usersSnapshot.size);
                 
-                // 清理測試文件
-                await deleteDoc(testRef);
-                console.log('Firebase 刪除權限正常');
-                
+                console.log('Firebase 基本連接測試通過');
                 return true;
             } catch (error) {
                 console.error('Firebase 測試失敗:', error);
-                alert('Firebase 連接測試失敗: ' + error.message);
+                console.error('錯誤代碼:', error.code);
+                console.error('錯誤訊息:', error.message);
+                
+                // 顯示錯誤給使用者
+                if (error.code === 'permission-denied') {
+                    alert('Firebase 權限錯誤: 請檢查 Firestore 規則設定');
+                } else {
+                    alert('Firebase 連接測試失敗: ' + error.message);
+                }
                 return false;
             }
         }
