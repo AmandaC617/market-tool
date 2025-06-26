@@ -103,10 +103,9 @@
         // --- Firebase v11.6.1 SDKs ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, getDoc, writeBatch, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, query, where, onSnapshot, addDoc, doc, updateDoc, deleteDoc, serverTimestamp, arrayUnion, getDoc, writeBatch, getDocs, deleteField, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- App Config & State ---
-        // *** ATTENTION: Corrected the spelling of "timelimited". Please verify this is correct. ***
         const SUPER_ADMIN_EMAIL = "amanda.chien@timelimited.com.tw"; 
         const firebaseConfig = {
             apiKey: "AIzaSyALiBzYT1uRmRKBD7nlDLw0TyD3UVyn3S4",
@@ -169,14 +168,16 @@
         const escapeHTML = (str) => str ? str.replace(/[&<>"']/g, (match) => ({'&': '&amp;','<': '&lt;','>': '&gt;','"': '&quot;',"'": '&#39;'}[match])) : '';
 
         // --- AUTHENTICATION & App Initialization ---
-        onAuthStateChanged(auth, user => {
+        onAuthStateChanged(auth, async (user) => {
             UI.loader.classList.add('hidden');
             if (user) {
                 currentUser = { uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL };
+                // *** NEW: Store user info in a separate collection for easy lookup ***
+                const userRef = doc(db, "users", user.uid);
+                await setDoc(userRef, { email: user.email, name: user.displayName }, { merge: true });
                 initializeAppUI();
             } else {
                 currentUser = null;
-                // Cleanup all listeners on logout
                 Object.values(unsubscribeComments).forEach(unsub => unsub());
                 if (unsubscribeProjects) unsubscribeProjects();
                 if (unsubscribeProjectDetail) unsubscribeProjectDetail();
@@ -196,49 +197,78 @@
         }
 
         // --- CRUD & Core Logic ---
-        function handleProjectFormSubmit(e) {
+        async function handleProjectFormSubmit(e) {
             e.preventDefault();
-            const id = UI.projectIdInput.value;
-            const projectData = {
-                name: UI.projectNameInput.value.trim(),
-                client: UI.clientNameInput.value.trim(),
-                market: UI.marketInput.value.trim(),
-                proposalTime: UI.proposalTimeInput.value,
-                status: UI.statusInput.value,
-                launchDate: UI.launchDateInput.value,
-                closeDate: UI.closeDateInput.value,
-                dashboardLinks: { 
-                    internal: UI.dashboardInternalLinkInput.value.trim(),
-                    client: UI.dashboardClientLinkInput.value.trim()
-                },
-                updatedAt: serverTimestamp()
-            };
+            const submitButton = UI.projectForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.textContent = '儲存中...';
+            
+            // (A) DEBUG: Check currentUser at creation
+            console.log('Submitting form with currentUser:', currentUser);
+            if (!currentUser) {
+                alert('錯誤：使用者未登入，無法儲存專案。');
+                submitButton.disabled = false;
+                submitButton.textContent = '儲存';
+                return;
+            }
 
-            if (id) {
-                updateDoc(doc(db, "projects", id), projectData).then(() => UI.projectModal.classList.add('hidden'));
-            } else {
-                Object.assign(projectData, {
-                    ownerId: currentUser.uid,
-                    members: [currentUser.uid],
-                    createdAt: serverTimestamp(),
-                    completedSteps: [],
-                    stepCompletionDates: {},
-                    briefingFiles: { documents: [], logos: [], videos: [] },
-                    aiFiles: { file1: [], file2: [] },
-                    mediaProposals: [],
-                    brandCreative: { redirectLink: '', scripts: [
-                        { id: 1, text: '', status: 'pending', approvedBy: null, approvalDate: null },
-                        { id: 2, text: '', status: 'pending', approvedBy: null, approvalDate: null },
-                        { id: 3, text: '', status: 'pending', approvedBy: null, approvalDate: null }
-                    ]},
-                    creativeFolder: []
-                });
-                addDoc(collection(db, "projects"), projectData).then(() => UI.projectModal.classList.add('hidden'));
+            try {
+                const id = UI.projectIdInput.value;
+                const projectData = {
+                    name: UI.projectNameInput.value.trim(),
+                    client: UI.clientNameInput.value.trim(),
+                    market: UI.marketInput.value.trim(),
+                    proposalTime: UI.proposalTimeInput.value,
+                    status: UI.statusInput.value,
+                    launchDate: UI.launchDateInput.value || null,
+                    closeDate: UI.closeDateInput.value || null,
+                    dashboardLinks: { 
+                        internal: UI.dashboardInternalLinkInput.value.trim(),
+                        client: UI.dashboardClientLinkInput.value.trim()
+                    },
+                    updatedAt: serverTimestamp()
+                };
+
+                if (id) {
+                    await updateDoc(doc(db, "projects", id), projectData);
+                } else {
+                    Object.assign(projectData, {
+                        ownerId: currentUser.uid,
+                        members: [currentUser.uid], // Start with the creator as a member
+                        memberEmails: [currentUser.email], // Also store email for lookup
+                        createdAt: serverTimestamp(),
+                        completedSteps: [],
+                        stepCompletionDates: {},
+                        briefingFiles: { documents: [], logos: [], videos: [] },
+                        aiFiles: { file1: [], file2: [] },
+                        mediaProposals: [],
+                        brandCreative: { redirectLink: '', scripts: [
+                            { id: 1, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                            { id: 2, text: '', status: 'pending', approvedBy: null, approvalDate: null },
+                            { id: 3, text: '', status: 'pending', approvedBy: null, approvalDate: null }
+                        ]},
+                        creativeFolder: []
+                    });
+                    // (A) DEBUG: Log data before saving
+                    console.log('New project data to be saved:', projectData);
+                    await addDoc(collection(db, "projects"), projectData);
+                }
+                UI.projectModal.classList.add('hidden');
+            } catch (error) {
+                console.error("專案儲存失敗:", error);
+                alert(`儲存專案時發生錯誤: ${error.message}\n請檢查控制台以獲取更多資訊。`);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = '儲存';
+                // (C) Clear the form more explicitly
+                UI.projectForm.reset();
+                UI.projectIdInput.value = '';
             }
         }
         
         function openProjectModal(project = null) {
             UI.projectForm.reset();
+            UI.projectIdInput.value = '';
             if (project) {
                 UI.projectModalTitle.textContent = "編輯專案";
                 UI.projectIdInput.value = project.id;
@@ -253,18 +283,13 @@
                 UI.dashboardClientLinkInput.value = project.dashboardLinks?.client || '';
             } else {
                 UI.projectModalTitle.textContent = "新增專案";
-                UI.projectIdInput.value = '';
             }
             UI.projectModal.classList.remove('hidden');
         }
 
         async function addFileLog(projectId, field, link) {
             if (!link.trim()) return;
-            const logEntry = {
-                link: link.trim(),
-                user: currentUser.email,
-                date: new Date().toISOString()
-            };
+            const logEntry = { link: link.trim(), user: currentUser.email, date: new Date().toISOString() };
             await updateDoc(doc(db, "projects", projectId), { [field]: arrayUnion(logEntry) });
         }
         
@@ -292,9 +317,12 @@
         
         // --- RENDERING LOGIC ---
         function renderProjectsList(projects) {
+             // (C) DEBUG: Log the projects array returned from Firestore
+            console.log('Rendering project list with data:', projects);
+
             UI.projectsContainer.innerHTML = '';
             if (projects.length === 0) {
-                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案</p>`; return;
+                UI.projectsContainer.innerHTML = `<p class="text-gray-500 col-span-full text-center py-10">無專案，請點擊右上角新增。</p>`; return;
             }
             projects.sort((a, b) => (b.createdAt?.toDate() || 0) - (a.createdAt?.toDate() || 0));
             projects.forEach(project => {
@@ -321,6 +349,23 @@
         function renderProjectDetail(project, canEdit) {
             const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
 
+            // *** NEW: Member Management UI ***
+            const memberManagementUI = canEdit ? `
+                <div class="mt-8">
+                    <h4 class="text-lg font-semibold text-gray-800">成員管理</h4>
+                    <div class="mt-2 p-4 bg-gray-50 rounded-lg">
+                        <p class="font-bold">現有成員:</p>
+                        <ul class="list-disc list-inside text-sm text-gray-700 mt-2 mb-4">
+                            ${(project.memberEmails || []).map(email => `<li>${escapeHTML(email)}</li>`).join('')}
+                        </ul>
+                        <div class="flex gap-2 items-center">
+                            <input type="email" id="add-member-email" placeholder="輸入成員 Email..." class="flex-grow p-1 border rounded text-sm">
+                            <button id="add-member-btn" class="bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600">新增成員</button>
+                        </div>
+                    </div>
+                </div>
+            ` : '';
+            
             const detailHTML = `
                 <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
                     <button id="back-to-projects-btn" class="text-indigo-600 hover:text-indigo-800 font-semibold">&larr; 返回專案列表</button>
@@ -347,6 +392,7 @@
                         </div>
                     </div>
                     <div class="mt-6"><h3 class="text-sm font-medium text-gray-500">專案總進度</h3><div class="mt-2 flex items-center"><div class="w-full bg-gray-200 rounded-full h-4 mr-4"><div class="progress-bar bg-indigo-600 h-4 rounded-full" style="width: ${progress}%"></div></div><span class="font-bold">${progress}%</span></div></div>
+                    ${memberManagementUI}
                 </div>
                 <div id="steps-container" class="space-y-6">${[1,2,3,4,5,6].map(stepNum => renderStepCard(stepNum, project, canEdit)).join('')}</div>`;
             
@@ -461,11 +507,16 @@
         function listenForProjects() {
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
-            const q = isSuperAdmin(currentUser) ? query(projectsRef) : query(projectsRef, where("members", "array-contains", currentUser.uid));
+            const q = isSuperAdmin(currentUser) 
+                ? query(projectsRef) 
+                : query(projectsRef, where("members", "array-contains", currentUser.uid));
+            
             unsubscribeProjects = onSnapshot(q, snapshot => {
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderProjectsList(projects);
-            }, console.error);
+            }, error => {
+                console.error("Error listening for projects:", error);
+            });
         }
         
         function showProjectDetail(projectId) {
@@ -479,6 +530,7 @@
                     const canEdit = isSuperAdmin(currentUser);
                     renderProjectDetail(projectData, canEdit);
                 } else {
+                    console.log("Project not found, returning to list.");
                     backToProjectsList();
                 }
             }, console.error);
@@ -583,6 +635,40 @@
                         });
                     });
                 });
+
+                // *** NEW: Add member event listener ***
+                const addMemberBtn = detailView.querySelector('#add-member-btn');
+                if (addMemberBtn) {
+                    addMemberBtn.addEventListener('click', async () => {
+                        const emailInput = detailView.querySelector('#add-member-email');
+                        const email = emailInput.value.trim();
+                        if (!email) return alert('請輸入 Email');
+
+                        // Find user by email
+                        const usersRef = collection(db, "users");
+                        const q = query(usersRef, where("email", "==", email));
+                        const querySnapshot = await getDocs(q);
+                        
+                        if (querySnapshot.empty) {
+                            return alert(`找不到 Email 為 ${email} 的使用者。請確認該使用者已用 Google 登入過一次系統。`);
+                        }
+
+                        let newMemberUid;
+                        querySnapshot.forEach((doc) => {
+                            newMemberUid = doc.id;
+                        });
+
+                        // Add new member's UID and email to the project
+                        const projectRef = doc(db, "projects", projectId);
+                        await updateDoc(projectRef, {
+                            members: arrayUnion(newMemberUid),
+                            memberEmails: arrayUnion(email)
+                        });
+
+                        emailInput.value = '';
+                        alert(`已成功新增成員 ${email}`);
+                    });
+                }
             }
         }
         
