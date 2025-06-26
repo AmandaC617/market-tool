@@ -130,8 +130,9 @@
         let unsubscribeProjects = null;
         let unsubscribeProjectDetail = null;
         let unsubscribeComments = {};
-        let lastKnownProjectState = {}; // For visual cues
+        let lastKnownProjectState = {};
         const TOTAL_STEPS = 6;
+        let allUsersCache = new Map();
 
         // --- UI Elements ---
         const UI = {
@@ -168,12 +169,6 @@
             confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
         };
 
-        // DEBUG: Check if essential UI elements are found
-        if (!UI.newProjectBtn || !UI.projectModal) {
-            console.error("CRITICAL ERROR: 'new-project-btn' or 'project-modal' not found in the DOM. Check your HTML IDs.");
-        }
-
-
         // --- Helper Functions ---
         const isSuperAdmin = (user) => user?.email === SUPER_ADMIN_EMAIL;
         const toLocaleString = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('zh-TW', { hour12: false }) : 'N/A';
@@ -198,6 +193,7 @@
                 currentUser = { uid: user.uid, name: user.displayName, email: user.email, avatar: user.photoURL };
                 const userRef = doc(db, "users", user.uid);
                 await setDoc(userRef, { email: user.email, name: user.displayName, avatar: user.photoURL }, { merge: true });
+                await fetchAllUsers();
                 initializeAppUI();
             } else {
                 currentUser = null;
@@ -209,6 +205,14 @@
                 UI.adminBadge.classList.add('hidden');
             }
         });
+
+        async function fetchAllUsers() {
+            allUsersCache.clear();
+            const usersSnapshot = await getDocs(collection(db, "users"));
+            usersSnapshot.forEach(doc => {
+                allUsersCache.set(doc.id, doc.data());
+            });
+        }
 
         function initializeAppUI() {
             UI.loginModal.classList.add('hidden');
@@ -253,8 +257,8 @@
                 } else {
                     Object.assign(projectData, {
                         ownerId: currentUser.uid,
-                        members: [currentUser.uid], // Start with the creator's UID in an array
-                        memberEmails: [currentUser.email], // Also store email for display
+                        members: [currentUser.uid],
+                        memberEmails: [currentUser.email], 
                         createdAt: serverTimestamp(),
                         completedSteps: [],
                         stepCompletionDates: {},
@@ -323,7 +327,7 @@
         async function addScriptComment(projectId, scriptId, text, button) {
              if (!text.trim()) return;
              toggleButtonLoading(button, true, '送出');
-             const commentData = { text, scriptId, author: { uid: currentUser.uid, email: currentUser.email, name: currentUser.name, avatar: currentUser.avatar }, createdAt: serverTimestamp() };
+             const commentData = { text, scriptId, author: { uid:currentUser.uid, email: currentUser.email, name: currentUser.name, avatar: currentUser.avatar }, createdAt: serverTimestamp() };
              try {
                 await addDoc(collection(db, "projects", projectId, "scriptComments"), commentData);
              } catch(error) {
@@ -434,7 +438,6 @@
                                     </div>
                                 </div>
                                 <div id="step-content-${stepNum}" class="step-content mt-4 pt-4 border-t border-gray-200">
-                                    <!-- Content will be rendered by renderStepContent -->
                                 </div>
                             </div>`;
                     }).join('')}
@@ -539,16 +542,18 @@
             const container = UI.projectDetailView.querySelector('#member-management-container');
             if (!container || !canEdit) return;
 
-            const membersHTML = Object.entries(project.members || {}).map(([uid, member]) => `
+            const membersHTML = (project.memberEmails || []).map(email => {
+                 const memberUid = Array.from(allUsersCache.keys()).find(uid => allUsersCache.get(uid)?.email === email);
+                 const memberData = allUsersCache.get(memberUid) || { avatar: '', name: '未知使用者' };
+                return `
                 <li class="flex items-center justify-between py-1">
                     <div class="flex items-center">
-                        <img src="${escapeHTML(member.avatar)}" alt="${escapeHTML(member.name)}" class="w-6 h-6 rounded-full mr-2">
-                        <span>${escapeHTML(member.name)} (${escapeHTML(member.email)})</span>
-                        <span class="ml-2 text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">${member.role || 'member'}</span>
+                        <img src="${escapeHTML(memberData.avatar)}" alt="${escapeHTML(memberData.name)}" class="w-6 h-6 rounded-full mr-2">
+                        <span>${escapeHTML(memberData.name)} (${escapeHTML(email)})</span>
                     </div>
-                    ${member.email !== SUPER_ADMIN_EMAIL ? `<button class="remove-member-btn text-red-500 hover:text-red-700 text-xs font-bold" data-uid="${uid}">移除</button>` : ''}
-                </li>
-            `).join('');
+                    ${email !== SUPER_ADMIN_EMAIL ? `<button class="remove-member-btn text-red-500 hover:text-red-700 text-xs font-bold" data-email="${escapeHTML(email)}">移除</button>` : ''}
+                </li>`;
+            }).join('');
 
             container.innerHTML = `
                 <h4 class="text-lg font-semibold text-gray-800">成員管理</h4>
@@ -610,19 +615,19 @@
             if (unsubscribeProjects) unsubscribeProjects();
             const projectsRef = collection(db, "projects");
             
-            // *** FIXED: Correct query for map data structure ***
+            // *** FIXED: Correct query for ARRAY data structure ***
             const q = isSuperAdmin(currentUser) 
                 ? query(projectsRef) 
-                : query(projectsRef, where(`members.${currentUser.uid}`, "!=", null));
+                : query(projectsRef, where("members", "array-contains", currentUser.uid));
             
             console.log("Listening for projects with query:", q); // DEBUG
             
             unsubscribeProjects = onSnapshot(q, snapshot => {
-                console.log('專案列表:', snapshot.docs.map(doc => doc.data())); // DEBUG
+                console.log('onSnapshot 回傳資料:', snapshot.docs.map(doc => ({id: doc.id, ...doc.data()}))); // DEBUG
                 const projects = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 renderProjectsList(projects);
             }, error => {
-                console.error("Error listening for projects:", error);
+                console.error("監聽專案列表失敗:", error);
             });
         }
         
@@ -799,16 +804,11 @@
 
                             const userDoc = querySnapshot.docs[0];
                             const newMemberUid = userDoc.id;
-                            const newMemberData = userDoc.data();
 
                             const projectRef = doc(db, "projects", projectId);
                             await updateDoc(projectRef, {
-                                [`members.${newMemberUid}`]: {
-                                    email: newMemberData.email,
-                                    name: newMemberData.name,
-                                    avatar: newMemberData.avatar,
-                                    role: 'member'
-                                }
+                                members: arrayUnion(newMemberUid),
+                                memberEmails: arrayUnion(email)
                             });
                             emailInput.value = '';
                             alert(`已成功新增成員 ${email}`);
@@ -822,15 +822,22 @@
 
                  detailView.querySelectorAll('.remove-member-btn').forEach(btn => {
                     btn.addEventListener('click', async () => {
-                        const uidToRemove = btn.dataset.uid;
-                        const emailToRemove = project.members[uidToRemove]?.email;
+                        const emailToRemove = btn.dataset.email;
                         if (!confirm(`確定要移除成員 ${emailToRemove} 嗎？`)) return;
                         
                         toggleButtonLoading(btn, true, '移除');
-                        const projectRef = doc(db, "projects", projectId);
                         try {
+                           const projectRef = doc(db, "projects", projectId);
+                           const usersRef = collection(db, "users");
+                           const q = query(usersRef, where("email", "==", emailToRemove));
+                           const userSnapshot = await getDocs(q);
+
+                           if (userSnapshot.empty) throw new Error("找不到要移除的使用者");
+                           
+                           const uidToRemove = userSnapshot.docs[0].id;
                            await updateDoc(projectRef, {
-                               [`members.${uidToRemove}`]: deleteField()
+                                members: arrayRemove(uidToRemove),
+                                memberEmails: arrayRemove(emailToRemove)
                            });
                            alert('成員已移除');
                         } catch (error) {
