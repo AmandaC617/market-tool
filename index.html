@@ -868,8 +868,7 @@
                 const incompleteSteps = [];
                 for (let i = 1; i <= TOTAL_STEPS; i++) {
                     if (!completedSteps.includes(i)) {
-                        const stepNames = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾", "結案報告"];
-                        incompleteSteps.push(stepNames[i-1]);
+                        incompleteSteps.push(STEP_TITLES[i-1]);
                     }
                 }
 
@@ -909,6 +908,9 @@
             console.log('專案列表渲染完成，總共渲染了', projects.length, '個專案');
         }
 
+        // 全域步驟標題陣列
+        const STEP_TITLES = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾", "結案報告"];
+
         function renderProjectDetail(project, canEdit) {
             const progress = Math.round(((project.completedSteps?.length || 0) / TOTAL_STEPS) * 100);
             
@@ -947,11 +949,10 @@
                 <div id="steps-container" class="space-y-6">
                     ${[1,2,3,4,5,6,7].map(stepNum => {
                         const isComplete = project.completedSteps?.includes(stepNum);
-                        const stepTitles = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾", "結案報告"];
                         return `
                             <div id="step-card-${stepNum}" class="step-item ${isComplete ? 'step-complete' : 'step-pending'} border-2 rounded-lg p-6 bg-white">
                                 <div class="flex justify-between items-center cursor-pointer" data-step-toggler="${stepNum}">
-                                    <h3 class="text-xl font-bold flex items-center gap-2">${stepNum}. ${stepTitles[stepNum-1]} <div id="new-activity-${stepNum}" class="hidden new-activity-dot"></div></h3>
+                                    <h3 class="text-xl font-bold flex items-center gap-2">${stepNum}. ${STEP_TITLES[stepNum-1]} <div id="new-activity-${stepNum}" class="hidden new-activity-dot"></div></h3>
                                     <div class="flex items-center gap-4">
                                        ${isComplete ? `<span class="text-sm text-green-700 font-medium">完成于: ${toLocaleDateString(project.stepCompletionDates?.[stepNum])}</span>` : `<span class="text-sm text-gray-500">待辦</span>`}
                                        <svg class="w-6 h-6 transform transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
@@ -981,15 +982,23 @@
             bindDetailViewEvents(project, canEdit);
             checkForNewActivity(project);
         }
-        
-        // 全域步驟標題陣列
-        const STEP_TITLES = ["Briefing", "AI 智能判斷", "媒體提案", "品牌創意流程", "創意 Story Board", "創意資料夾", "結案報告"];
+
+        // 全域 renderAdminInput 函式
+        function renderAdminInput(inputId, fieldPath, placeholder, required = false, stepNum = 1, canEdit = true) {
+            return canEdit ? `<div class="mt-4 pt-4 border-t border-dashed">
+                <div class="flex gap-2 items-center">
+                    <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm ${required ? 'border-red-300' : ''}" id="${inputId}-${stepNum}" ${required ? 'required' : ''}>
+                    <button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button>
+                </div>
+                ${required ? '<p class="text-xs text-red-500 mt-1">* 此欄位為必填</p>' : ''}
+            </div>` : '';
+        }
 
         // 抽出文件區塊渲染
-        function renderFileSection(title, logs, fieldPath, canEdit, inputId, placeholder) {
+        function renderFileSection(title, logs, fieldPath, canEdit, inputId, placeholder, stepNum) {
             return `
                 <div><h5 class="font-bold text-gray-700">${title}</h5>${renderLogList(logs, fieldPath, canEdit)}</div>
-                ${canEdit ? renderAdminInput(inputId, fieldPath, placeholder) : ''}`;
+                ${canEdit ? renderAdminInput(inputId, fieldPath, placeholder, false, stepNum, canEdit) : ''}`;
         }
 
         function renderStepContent(stepNum, project, canEdit) {
@@ -999,35 +1008,26 @@
             const isReportSubmitted = !!finalReport.submittedBy;
             const isReportApproved = !!finalReport.approvedBy;
 
-            // 保留原本的 renderAdminInput
-            const renderAdminInput = (inputId, fieldPath, placeholder, required = false) => canEdit ? `<div class="mt-4 pt-4 border-t border-dashed">
-                <div class="flex gap-2 items-center">
-                    <input type="url" placeholder="${placeholder}" class="flex-grow p-1 border rounded text-sm ${required ? 'border-red-300' : ''}" id="${inputId}-${stepNum}" ${required ? 'required' : ''}>
-                    <button class="add-log-btn bg-indigo-500 text-white text-xs px-3 py-1 rounded hover:bg-indigo-600" data-field="${fieldPath}" data-input-id="${inputId}-${stepNum}">新增</button>
-                </div>
-                ${required ? '<p class="text-xs text-red-500 mt-1">* 此欄位為必填</p>' : ''}
-            </div>` : '';
-
             let contentHTML = '';
             switch(stepNum) {
                 case 1:
                     contentHTML = [
-                        renderFileSection('a. 文件', project.briefingFiles?.documents, 'briefingFiles.documents', canEdit, 'input-briefing-doc', '新增文件連結...'),
-                        renderFileSection('b. Logo (PNG)', project.briefingFiles?.logos, 'briefingFiles.logos', canEdit, 'input-briefing-logo', '新增 Logo 連結...'),
-                        renderFileSection('c. 影片素材', project.briefingFiles?.videos, 'briefingFiles.videos', canEdit, 'input-briefing-video', '新增影片連結...')
+                        renderFileSection('a. 文件', project.briefingFiles?.documents, 'briefingFiles.documents', canEdit, 'input-briefing-doc', '新增文件連結...', stepNum),
+                        renderFileSection('b. Logo (PNG)', project.briefingFiles?.logos, 'briefingFiles.logos', canEdit, 'input-briefing-logo', '新增 Logo 連結...', stepNum),
+                        renderFileSection('c. 影片素材', project.briefingFiles?.videos, 'briefingFiles.videos', canEdit, 'input-briefing-video', '新增影片連結...', stepNum)
                     ].join('');
                     break;
                 case 2:
                     contentHTML = [
-                        renderFileSection('Excel 文件 1', project.aiFiles?.file1, 'aiFiles.file1', canEdit, 'input-ai-1', '新增文件 1 連結...'),
-                        renderFileSection('Excel 文件 2', project.aiFiles?.file2, 'aiFiles.file2', canEdit, 'input-ai-2', '新增文件 2 連結...')
+                        renderFileSection('Excel 文件 1', project.aiFiles?.file1, 'aiFiles.file1', canEdit, 'input-ai-1', '新增文件 1 連結...', stepNum),
+                        renderFileSection('Excel 文件 2', project.aiFiles?.file2, 'aiFiles.file2', canEdit, 'input-ai-2', '新增文件 2 連結...', stepNum)
                     ].join('');
                     break;
                 case 3:
-                    contentHTML = renderFileSection('提案文件', project.mediaProposals, 'mediaProposals', canEdit, 'input-media-proposal', '新增提案連結...');
+                    contentHTML = renderFileSection('提案文件', project.mediaProposals, 'mediaProposals', canEdit, 'input-media-proposal', '新增提案連結...', stepNum);
                     break;
                 case 6:
-                    contentHTML = renderFileSection('創意資料夾', project.creativeFolder, 'creativeFolder', canEdit, 'input-creative-folder', '新增資料夾連結...');
+                    contentHTML = renderFileSection('創意資料夾', project.creativeFolder, 'creativeFolder', canEdit, 'input-creative-folder', '新增資料夾連結...', stepNum);
                     break;
                 // 其餘步驟維持原本內容
                 case 4:
@@ -1101,12 +1101,12 @@
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <h5 class="font-bold text-gray-700 mb-3">結案報告連結</h5>
                                 ${renderLogList(finalReport.links, 'finalReport.links', canEdit)}
-                                ${canEdit ? renderAdminInput('input-final-report-links', 'finalReport.links', '新增結案報告連結...') : ''}
+                                ${canEdit ? renderAdminInput('input-final-report-links', 'finalReport.links', '新增結案報告連結...', false, 7, canEdit) : ''}
                             </div>
                             <div class="bg-gray-50 p-4 rounded-lg">
                                 <h5 class="font-bold text-gray-700 mb-3">結案附件</h5>
                                 ${renderLogList(finalReport.attachments, 'finalReport.attachments', canEdit)}
-                                ${canEdit ? renderAdminInput('input-final-report', 'finalReport.attachments', '新增結案報告附件...') : ''}
+                                ${canEdit ? renderAdminInput('input-final-report', 'finalReport.attachments', '新增結案報告附件...', false, 7, canEdit) : ''}
                             </div>
                             ${isReportApproved ? `
                                 <div class="bg-green-50 p-4 rounded-lg border border-green-200">
