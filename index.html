@@ -752,6 +752,76 @@
                 toggleButtonLoading(button, false, '審查通過此腳本');
             }
         }
+
+        async function rejectScript(projectId, scriptId, button) {
+            const rejectionReason = prompt('請輸入拒絕原因：');
+            if (!rejectionReason) return;
+            
+            toggleButtonLoading(button, true, '退回修改中');
+            const projectRef = doc(db, "projects", projectId);
+            try {
+                const projectSnap = await getDoc(projectRef);
+                if (!projectSnap.exists()) throw new Error("找不到專案");
+                
+                const scripts = projectSnap.data().brandCreative.scripts;
+                const scriptIndex = scripts.findIndex(s => s.id === scriptId);
+
+                if (scriptIndex !== -1) {
+                    scripts[scriptIndex].status = 'rejected';
+                    scripts[scriptIndex].rejectedBy = { 
+                        uid: currentUser.uid,
+                        email: currentUser.email, 
+                        name: currentUser.name, 
+                        avatar: currentUser.avatar 
+                    };
+                    scripts[scriptIndex].rejectedAt = new Date().toISOString();
+                    scripts[scriptIndex].rejectionReason = rejectionReason;
+                    await updateDoc(projectRef, { "brandCreative.scripts": scripts });
+                    console.log('腳本退回修改成功:', scriptId);
+                    alert('腳本已退回修改！');
+                }
+            } catch(error) {
+                console.error("退回修改失敗:", error);
+                alert('退回修改失敗: ' + error.message);
+            } finally {
+                toggleButtonLoading(button, false, '退回修改');
+            }
+        }
+        
+        async function resubmitScript(projectId, scriptId, button) {
+            toggleButtonLoading(button, true, '重新送審中');
+            const projectRef = doc(db, "projects", projectId);
+            try {
+                const projectSnap = await getDoc(projectRef);
+                if (!projectSnap.exists()) throw new Error("找不到專案");
+                
+                const scripts = projectSnap.data().brandCreative.scripts;
+                const scriptIndex = scripts.findIndex(s => s.id === scriptId);
+
+                if (scriptIndex !== -1) {
+                    scripts[scriptIndex].status = 'submitted';
+                    scripts[scriptIndex].submittedBy = { 
+                        uid: currentUser.uid,
+                        email: currentUser.email, 
+                        name: currentUser.name, 
+                        avatar: currentUser.avatar 
+                    };
+                    scripts[scriptIndex].submittedAt = new Date().toISOString();
+                    // 清除拒絕相關資訊
+                    scripts[scriptIndex].rejectedBy = null;
+                    scripts[scriptIndex].rejectedAt = null;
+                    scripts[scriptIndex].rejectionReason = null;
+                    await updateDoc(projectRef, { "brandCreative.scripts": scripts });
+                    console.log('腳本重新送審成功:', scriptId);
+                    alert('腳本已重新送審！');
+                }
+            } catch(error) {
+                console.error("重新送審失敗:", error);
+                alert('重新送審失敗: ' + error.message);
+            } finally {
+                toggleButtonLoading(button, false, '重新送審');
+            }
+        }
         
         async function submitScript(projectId, scriptId, button) {
             toggleButtonLoading(button, true, '送審中');
@@ -1058,10 +1128,12 @@
                             ${(project.brandCreative?.scripts || []).map(script => {
                                 const isApproved = script.status === 'approved';
                                 const isSubmitted = script.status === 'submitted';
-                                return `<div class="p-4 rounded-lg border ${isApproved ? 'script-approved' : isSubmitted ? 'bg-blue-50' : 'bg-white'}">
+                                const isRejected = script.status === 'rejected';
+                                return `<div class="p-4 rounded-lg border ${isApproved ? 'script-approved' : isSubmitted ? 'bg-blue-50' : isRejected ? 'bg-red-50' : 'bg-white'}">
                                     <h5 class="font-bold text-gray-800">腳本 ${script.id} 
                                         ${isApproved ? `<span class="text-green-600 font-bold">(已核准)</span>` : 
                                           isSubmitted ? `<span class="text-blue-600 font-bold">(已送審)</span>` : 
+                                          isRejected ? `<span class="text-red-600 font-bold">(需修改)</span>` :
                                           `<span class="text-gray-500">(草稿)</span>`}
                                     </h5>
                                     ${isApproved ? `<div class="text-xs text-gray-600 bg-green-100 p-2 rounded mt-2">
@@ -1075,6 +1147,13 @@
                                         <div class="mt-2 pt-2 border-t border-blue-200">
                                             <p><strong>送件人:</strong> ${escapeHTML(script.submittedBy?.name)} (${toLocaleString(script.submittedAt)})</p>
                                         </div>
+                                    </div>` : isRejected ? `<div class="text-xs text-gray-600 bg-red-100 p-2 rounded mt-2">
+                                        <p class="whitespace-pre-wrap break-words">${escapeHTML(script.text) || '無內容'}</p>
+                                        <div class="mt-2 pt-2 border-t border-red-200 space-y-1">
+                                            <p><strong>送件人:</strong> ${escapeHTML(script.submittedBy?.name)} (${toLocaleString(script.submittedAt)})</p>
+                                            <p><strong>拒絕原因:</strong> ${escapeHTML(script.rejectionReason || '未提供')}</p>
+                                            <p><strong>拒絕人:</strong> ${escapeHTML(script.rejectedBy?.name)} (${toLocaleString(script.rejectedAt)})</p>
+                                        </div>
                                     </div>` : `<textarea class="w-full mt-2 p-2 border rounded" rows="4" data-script-id="${script.id}">${escapeHTML(script.text)}</textarea>
                                     ${canEdit ? `<div class="flex gap-2 mt-2">
                                         <button class="save-script-btn text-xs bg-gray-200 px-2 py-1 rounded hover:bg-gray-300" data-script-id="${script.id}">儲存草稿</button>
@@ -1085,7 +1164,13 @@
                                         <div id="comments-container-${script.id}" class="space-y-2 mt-2 max-h-40 overflow-y-auto pr-1 text-sm"></div>
                                         ${!isApproved ? `<div class="flex gap-2 mt-2"><input id="comment-input-${script.id}" type="text" placeholder="輸入意見..." class="flex-grow p-1 border rounded text-sm"><button class="add-script-comment-btn bg-blue-500 text-white text-xs px-3 py-1 rounded hover:bg-blue-600" data-script-id="${script.id}">送出</button></div>` : ''}
                                     </div>
-                                    ${canEdit && isSubmitted ? `<div class="text-right mt-4"><button class="approve-script-btn bg-green-600 text-white py-1 px-3 rounded text-sm hover:bg-green-700" data-script-id="${script.id}">審查通過此腳本</button></div>` : ''}
+                                    ${canEdit && isSubmitted ? `<div class="text-right mt-4 space-x-2">
+                                        <button class="approve-script-btn bg-green-600 text-white py-1 px-3 rounded text-sm hover:bg-green-700" data-script-id="${script.id}">審查通過</button>
+                                        <button class="reject-script-btn bg-red-600 text-white py-1 px-3 rounded text-sm hover:bg-red-700" data-script-id="${script.id}">退回修改</button>
+                                    </div>` : ''}
+                                    ${canEdit && isRejected ? `<div class="text-right mt-4">
+                                        <button class="resubmit-script-btn bg-blue-600 text-white py-1 px-3 rounded text-sm hover:bg-blue-700" data-script-id="${script.id}">重新送審</button>
+                                    </div>` : ''}
                                 </div>`
                             }).join('')}
                         </div>`;
@@ -1578,6 +1663,30 @@
                         return;
                     }
                     approveScript(projectId, parseInt(btn.dataset.scriptId), btn);
+                });
+            });
+
+            // 拒絕腳本按鈕
+            detailView.querySelectorAll('.reject-script-btn').forEach(btn => {
+                console.log('綁定拒絕腳本按鈕:', btn.dataset.scriptId);
+                btn.addEventListener('click', () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    rejectScript(projectId, parseInt(btn.dataset.scriptId), btn);
+                });
+            });
+
+            // 重新送審腳本按鈕
+            detailView.querySelectorAll('.resubmit-script-btn').forEach(btn => {
+                console.log('綁定重新送審腳本按鈕:', btn.dataset.scriptId);
+                btn.addEventListener('click', () => {
+                    if (!canEdit) {
+                        alert('您沒有權限執行此操作');
+                        return;
+                    }
+                    resubmitScript(projectId, parseInt(btn.dataset.scriptId), btn);
                 });
             });
 
